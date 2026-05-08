@@ -383,22 +383,24 @@
     renderChat();
 
     try {
-      const apiMessages = chatMessages
-        .filter(m => m.role !== 'system')
-        .map(m => ({ role: m.role, content: m.content }));
+      const apiMessages = [
+        { role: 'system', content: 'You are a Mermaid diagram assistant inside a live editor. When asked to create or modify a diagram, respond with ONLY a valid mermaid code block wrapped in triple backticks with "mermaid" language tag. Keep explanations minimal — one short sentence before the code block at most. If the user asks a non-diagram question, answer briefly. Always output valid Mermaid syntax.' },
+        ...chatMessages
+          .filter(m => m.role !== 'system')
+          .map(m => ({ role: m.role, content: m.content })),
+      ];
 
       const res = await fetch('/api/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
+          model: 'anthropic/claude-sonnet-4.5',
           max_tokens: 1000,
-          system: 'You are a Mermaid diagram assistant inside a live editor. When asked to create or modify a diagram, respond with ONLY a valid mermaid code block wrapped in triple backticks with "mermaid" language tag. Keep explanations minimal — one short sentence before the code block at most. If the user asks a non-diagram question, answer briefly. Always output valid Mermaid syntax.',
           messages: apiMessages,
         }),
       });
       const data = await res.json();
-      const reply = data.content?.map(b => b.text || '').join('\n') || 'Sorry, something went wrong.';
+      const reply = data.choices?.[0]?.message?.content || 'Sorry, something went wrong.';
       chatMessages.push({ role: 'assistant', content: reply });
     } catch {
       chatMessages.push({ role: 'assistant', content: "Network error — couldn't reach the AI." });

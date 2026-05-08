@@ -4,12 +4,12 @@ const fs = require('fs');
 const path = require('path');
 
 const PORT = 3000;
-const API_KEY = process.env.ANTHROPIC_API_KEY;
+const API_KEY = process.env.OPENROUTER_API_KEY;
 
 if (!API_KEY) {
-  console.error('\n  ✗ Missing ANTHROPIC_API_KEY\n');
+  console.error('\n  ✗ Missing OPENROUTER_API_KEY\n');
   console.error('  Run with:');
-  console.error('    ANTHROPIC_API_KEY=sk-... node server.js\n');
+  console.error('    OPENROUTER_API_KEY=sk-or-... node server.js\n');
   process.exit(1);
 }
 
@@ -20,13 +20,14 @@ const server = http.createServer((req, res) => {
     req.on('data', chunk => body += chunk);
     req.on('end', () => {
       const apiReq = https.request({
-        hostname: 'api.anthropic.com',
-        path: '/v1/messages',
+        hostname: 'openrouter.ai',
+        path: '/api/v1/chat/completions',
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-api-key': API_KEY,
-          'anthropic-version': '2023-06-01',
+          'Authorization': `Bearer ${API_KEY}`,
+          'HTTP-Referer': 'http://localhost:3000',
+          'X-Title': 'Mermaid Studio',
         },
       }, apiRes => {
         res.writeHead(apiRes.statusCode, { 'Content-Type': 'application/json' });
