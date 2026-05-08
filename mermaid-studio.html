@@ -469,8 +469,7 @@
     const reader = new FileReader();
     reader.onload = () => {
       const text = String(reader.result || '');
-      const name = file.name.replace(/\.[^.]+$/, '');
-      openChatWith(text, name || 'Loaded chat', { greet: false });
+      openChatWith(text, file.name || 'Loaded chat', { greet: false });
     };
     reader.readAsText(file);
   });
