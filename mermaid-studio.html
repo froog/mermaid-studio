@@ -280,11 +280,12 @@
 
   function newChatId() { return `chat_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`; }
 
-  function makeChat(code) {
+  function makeChat(code, opts) {
+    const greet = !opts || opts.greet !== false;
     return {
       id: newChatId(),
       title: '',
-      messages: [{ role: 'assistant', content: GREETING }],
+      messages: greet ? [{ role: 'assistant', content: GREETING }] : [],
       code: code,
       updatedAt: Date.now(),
     };
@@ -418,8 +419,8 @@
 
   chatSelect.addEventListener('change', e => switchChat(e.target.value));
 
-  function openChatWith(code, titleHint) {
-    const c = makeChat(code);
+  function openChatWith(code, titleHint, opts) {
+    const c = makeChat(code, opts);
     if (titleHint) c.title = titleHint;
     store.chats[c.id] = c;
     store.activeId = c.id;
@@ -448,7 +449,7 @@
     reader.onload = () => {
       const text = String(reader.result || '');
       const name = file.name.replace(/\.[^.]+$/, '');
-      openChatWith(text, name || 'Loaded chat');
+      openChatWith(text, name || 'Loaded chat', { greet: false });
     };
     reader.readAsText(file);
   });
