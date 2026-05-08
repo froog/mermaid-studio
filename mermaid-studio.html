@@ -64,6 +64,23 @@
   .pane-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
   .pane-title { font-family: var(--mono); font-size: 11px; font-weight: 700; letter-spacing: 1.2px; color: var(--text1); }
 
+  .chat-header { gap: 8px; }
+  .chat-select {
+    flex: 1; min-width: 0; font-family: var(--mono); font-size: 11px;
+    padding: 5px 8px; border-radius: 6px; border: 1px solid var(--border);
+    background: var(--bg1); color: var(--text0); cursor: pointer; outline: none;
+  }
+  .chat-select:hover { border-color: var(--text2); }
+  .chat-icon-btn {
+    width: 24px; height: 24px; border-radius: 6px; border: 1px solid var(--border);
+    background: var(--bg1); color: var(--text1); cursor: pointer;
+    font-family: var(--mono); font-size: 14px; line-height: 1;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    transition: all .15s;
+  }
+  .chat-icon-btn:hover { background: var(--bg3); color: var(--text0); }
+  .chat-del-btn:hover { background: var(--red); border-color: var(--red); color: #fff; }
+
   /* ─── Editor Pane ─── */
   .editor-pane {
     width: 30%; min-width: 260px; display: flex; flex-direction: column;
@@ -89,10 +106,16 @@
     border-right: 1px solid var(--border); background: var(--bg0);
   }
   .diagram-content {
-    flex: 1; overflow: auto; display: flex; align-items: center;
-    justify-content: center; padding: 24px;
+    flex: 1; overflow: hidden; position: relative;
+    display: flex; align-items: center; justify-content: center; padding: 24px;
+    cursor: grab;
   }
-  .diagram-content svg { max-width: 100%; height: auto; }
+  .diagram-content.panning { cursor: grabbing; }
+  .diagram-stage {
+    position: absolute; left: 0; top: 0; transform-origin: 0 0;
+    will-change: transform;
+  }
+  .diagram-stage svg { display: block; }
   .placeholder { font-family: var(--mono); font-size: 13px; color: var(--text2); }
   .error-box {
     padding: 20px; border-radius: 8px; background: rgba(248,81,73,0.08);
@@ -191,9 +214,12 @@
 
     <!-- Chat -->
     <div class="chat-pane">
-      <div class="pane-header">
+      <div class="pane-header chat-header">
         <span class="pane-dot" style="background:var(--blue)"></span>
-        <span class="pane-title">AI ASSISTANT</span>
+        <span class="pane-title">AI</span>
+        <select id="chat-select" class="chat-select" aria-label="Select chat"></select>
+        <button id="chat-new" class="chat-icon-btn" title="New chat">+</button>
+        <button id="chat-del" class="chat-icon-btn chat-del-btn" title="Delete chat">×</button>
       </div>
       <div class="chat-scroll" id="chat-scroll"></div>
       <div class="chat-input-row">
@@ -204,7 +230,7 @@
   </div>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/11.4.1/mermaid.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js"></script>
 <script>
 (() => {
   // ─── Data ───
@@ -238,11 +264,61 @@
   const chatInput = document.getElementById('chat-input');
   const sendBtn = document.getElementById('send-btn');
   const exampleBar = document.getElementById('example-bar');
+  const chatSelect = document.getElementById('chat-select');
+  const chatNewBtn = document.getElementById('chat-new');
+  const chatDelBtn = document.getElementById('chat-del');
+
+  // ─── Persistence ───
+  const STORAGE_KEY = 'mermaid-studio:v1';
+  const GREETING = "I can help you create Mermaid diagrams. Describe what you need — a flowchart, sequence diagram, ER diagram, etc. — and I'll generate the code.";
+
+  function newChatId() { return `chat_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`; }
+
+  function makeChat(code) {
+    return {
+      id: newChatId(),
+      title: '',
+      messages: [{ role: 'assistant', content: GREETING }],
+      code: code,
+      updatedAt: Date.now(),
+    };
+  }
+
+  function deriveTitle(chat) {
+    const firstUser = chat.messages.find(m => m.role === 'user');
+    if (firstUser) {
+      const t = firstUser.content.trim().replace(/\s+/g, ' ');
+      return t.length > 40 ? t.slice(0, 40) + '…' : t;
+    }
+    const d = new Date(chat.updatedAt);
+    const hh = String(d.getHours()).padStart(2, '0');
+    const mm = String(d.getMinutes()).padStart(2, '0');
+    return `New chat ${hh}:${mm}`;
+  }
+
+  function loadStore() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && parsed.chats && parsed.activeId && parsed.chats[parsed.activeId]) {
+          return parsed;
+        }
+      }
+    } catch {}
+    const seed = makeChat(DEFAULT_CODE);
+    return { activeId: seed.id, chats: { [seed.id]: seed } };
+  }
+
+  function saveStore() {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(store)); } catch {}
+  }
+
+  let store = loadStore();
+  let activeChat = store.chats[store.activeId];
 
   // ─── State ───
-  let chatMessages = [
-    { role: 'assistant', content: "I can help you create Mermaid diagrams. Describe what you need — a flowchart, sequence diagram, ER diagram, etc. — and I'll generate the code." }
-  ];
+  let chatMessages = activeChat.messages;
   let chatLoading = false;
   let renderTimer = null;
   let renderId = 0;
@@ -274,6 +350,7 @@
     editor.value = code;
     updateLineNumbers();
     scheduleRender();
+    if (typeof persist === 'function' && activeChat) persist();
   }
 
   function updateLineNumbers() {
@@ -282,7 +359,7 @@
     lineNumbers.innerHTML = lines.map((_, i) => `<div class="line-num">${i + 1}</div>`).join('');
   }
 
-  editor.addEventListener('input', () => { updateLineNumbers(); scheduleRender(); });
+  editor.addEventListener('input', () => { updateLineNumbers(); scheduleRender(); persist(); });
   editor.addEventListener('scroll', () => { lineNumbers.scrollTop = editor.scrollTop; });
   editor.addEventListener('keydown', e => {
     if (e.key === 'Tab') {
@@ -293,7 +370,82 @@
       editor.selectionStart = editor.selectionEnd = start + 4;
       updateLineNumbers();
       scheduleRender();
+      persist();
     }
+  });
+
+  // ─── Chat persistence helpers ───
+  function persist() {
+    activeChat.code = editor.value;
+    activeChat.updatedAt = Date.now();
+    activeChat.title = deriveTitle(activeChat);
+    saveStore();
+    refreshSelect();
+  }
+
+  function refreshSelect() {
+    const ids = Object.keys(store.chats).sort(
+      (a, b) => store.chats[b].updatedAt - store.chats[a].updatedAt
+    );
+    chatSelect.innerHTML = '';
+    ids.forEach(id => {
+      const opt = document.createElement('option');
+      opt.value = id;
+      opt.textContent = store.chats[id].title || deriveTitle(store.chats[id]);
+      chatSelect.appendChild(opt);
+    });
+    chatSelect.value = store.activeId;
+  }
+
+  function switchChat(id) {
+    if (!store.chats[id]) return;
+    store.activeId = id;
+    activeChat = store.chats[id];
+    chatMessages = activeChat.messages;
+    saveStore();
+    editor.value = activeChat.code;
+    updateLineNumbers();
+    scheduleRender();
+    renderChat();
+    refreshSelect();
+  }
+
+  chatSelect.addEventListener('change', e => switchChat(e.target.value));
+
+  chatNewBtn.addEventListener('click', () => {
+    const c = makeChat(DEFAULT_CODE);
+    store.chats[c.id] = c;
+    store.activeId = c.id;
+    activeChat = c;
+    chatMessages = c.messages;
+    saveStore();
+    editor.value = c.code;
+    updateLineNumbers();
+    scheduleRender();
+    renderChat();
+    refreshSelect();
+  });
+
+  chatDelBtn.addEventListener('click', () => {
+    if (!window.confirm('Delete this chat?')) return;
+    delete store.chats[store.activeId];
+    const remaining = Object.keys(store.chats);
+    if (remaining.length === 0) {
+      const c = makeChat(DEFAULT_CODE);
+      store.chats[c.id] = c;
+      store.activeId = c.id;
+    } else {
+      remaining.sort((a, b) => store.chats[b].updatedAt - store.chats[a].updatedAt);
+      store.activeId = remaining[0];
+    }
+    activeChat = store.chats[store.activeId];
+    chatMessages = activeChat.messages;
+    saveStore();
+    editor.value = activeChat.code;
+    updateLineNumbers();
+    scheduleRender();
+    renderChat();
+    refreshSelect();
   });
 
   // ─── Diagram Rendering ───
@@ -313,7 +465,8 @@
       const uniqueId = `mmd-${Date.now()}`;
       const { svg } = await mermaid.render(uniqueId, code);
       if (id === renderId) {
-        diagramContent.innerHTML = `<div style="width:100%;display:flex;justify-content:center;align-items:center">${svg}</div>`;
+        diagramContent.innerHTML = `<div class="diagram-stage">${svg}</div>`;
+        fitDiagram();
       }
     } catch (e) {
       if (id === renderId) {
@@ -322,6 +475,88 @@
       document.querySelectorAll('[id^="dmmd-"]').forEach(el => el.remove());
     }
   }
+
+  // ─── Zoom & Pan ───
+  // Zoom resizes the SVG's CSS width/height so the browser re-rasterizes the
+  // vector at full resolution. Pan is a CSS translate on the stage wrapper.
+  let view = { x: 0, y: 0, scale: 1, baseW: 0, baseH: 0 };
+
+  function getStage() { return diagramContent.querySelector('.diagram-stage'); }
+  function getSvg() { const s = getStage(); return s ? s.querySelector('svg') : null; }
+
+  function applyView() {
+    const stage = getStage();
+    const svg = getSvg();
+    if (!stage || !svg || !view.baseW) return;
+    svg.style.width = `${view.baseW * view.scale}px`;
+    svg.style.height = `${view.baseH * view.scale}px`;
+    stage.style.transform = `translate(${view.x}px, ${view.y}px)`;
+  }
+
+  function captureBaseSize() {
+    const svg = getSvg();
+    if (!svg) return;
+    svg.style.maxWidth = 'none';
+    // Clear any prior sizing so we read the intrinsic size from viewBox/attrs.
+    svg.style.width = '';
+    svg.style.height = '';
+    const vb = svg.viewBox && svg.viewBox.baseVal;
+    if (vb && vb.width && vb.height) {
+      view.baseW = vb.width;
+      view.baseH = vb.height;
+    } else {
+      const r = svg.getBoundingClientRect();
+      view.baseW = r.width;
+      view.baseH = r.height;
+    }
+  }
+
+  function fitDiagram() {
+    if (!getSvg()) return;
+    captureBaseSize();
+    const cw = diagramContent.clientWidth;
+    const ch = diagramContent.clientHeight;
+    if (!view.baseW || !view.baseH) return;
+    const scale = Math.min(1, (cw - 48) / view.baseW, (ch - 48) / view.baseH);
+    view.scale = scale;
+    view.x = (cw - view.baseW * scale) / 2;
+    view.y = (ch - view.baseH * scale) / 2;
+    applyView();
+  }
+
+  diagramContent.addEventListener('wheel', e => {
+    if (!getSvg()) return;
+    e.preventDefault();
+    const rect = diagramContent.getBoundingClientRect();
+    const cx = e.clientX - rect.left;
+    const cy = e.clientY - rect.top;
+    const factor = Math.exp(-e.deltaY * 0.0015);
+    const newScale = Math.min(20, Math.max(0.05, view.scale * factor));
+    const k = newScale / view.scale;
+    view.x = cx - (cx - view.x) * k;
+    view.y = cy - (cy - view.y) * k;
+    view.scale = newScale;
+    applyView();
+  }, { passive: false });
+
+  let panState = null;
+  diagramContent.addEventListener('mousedown', e => {
+    if (e.button !== 0 || !getStage()) return;
+    panState = { startX: e.clientX, startY: e.clientY, origX: view.x, origY: view.y };
+    diagramContent.classList.add('panning');
+  });
+  window.addEventListener('mousemove', e => {
+    if (!panState) return;
+    view.x = panState.origX + (e.clientX - panState.startX);
+    view.y = panState.origY + (e.clientY - panState.startY);
+    applyView();
+  });
+  window.addEventListener('mouseup', () => {
+    if (!panState) return;
+    panState = null;
+    diagramContent.classList.remove('panning');
+  });
+  diagramContent.addEventListener('dblclick', () => { fitDiagram(); });
 
   // ─── Chat ───
   function renderChat() {
@@ -380,6 +615,7 @@
 
     chatMessages.push({ role: 'user', content: text });
     chatLoading = true;
+    persist();
     renderChat();
 
     try {
@@ -407,6 +643,7 @@
     }
 
     chatLoading = false;
+    persist();
     renderChat();
   }
 
@@ -419,7 +656,9 @@
   }
 
   // ─── Boot ───
-  setCode(DEFAULT_CODE);
+  if (!activeChat.title) activeChat.title = deriveTitle(activeChat);
+  setCode(activeChat.code);
+  refreshSelect();
   renderChat();
 })();
 </script>
