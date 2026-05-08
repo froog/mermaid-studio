@@ -38,6 +38,13 @@ textarea:focus, input:focus, button:focus-visible { outline: 1px solid var(--blu
 }
 .logo-group { display: flex; align-items: center; gap: 10px; }
 .logo-text { font-family: var(--mono); font-weight: 700; font-size: 14px; letter-spacing: 1.5px; }
+.help-btn {
+  width: 22px; height: 22px; border-radius: 50%; border: 1px solid var(--border);
+  background: var(--bg2); color: var(--text1); cursor: pointer;
+  font-family: var(--mono); font-size: 11px; font-weight: 700; line-height: 1;
+  display: flex; align-items: center; justify-content: center; transition: all .15s;
+}
+.help-btn:hover { background: var(--blue); border-color: var(--blue); color: #fff; }
 .example-bar { display: flex; gap: 6px; margin-left: auto; }
 .example-select {
   font-family: var(--mono); font-size: 11px; font-weight: 500;
@@ -174,3 +181,56 @@ textarea:focus, input:focus, button:focus-visible { outline: 1px solid var(--blu
 }
 .send-btn:hover:not(:disabled) { background: var(--blue); }
 .loading-dots { font-family: var(--mono); font-size: 14px; color: var(--text2); animation: pulse 1.2s ease-in-out infinite; }
+
+/* ─── Modal ─── */
+.modal[hidden] { display: none; }
+.modal {
+  position: fixed; inset: 0; z-index: 100;
+  display: flex; align-items: center; justify-content: center; padding: 40px;
+}
+.modal-backdrop {
+  position: absolute; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(2px);
+}
+.modal-panel {
+  position: relative; z-index: 1;
+  width: min(820px, 100%); max-height: 100%; display: flex; flex-direction: column;
+  background: var(--bg1); border: 1px solid var(--border); border-radius: 10px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+}
+.modal-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 18px; border-bottom: 1px solid var(--border); background: var(--bg2);
+  border-radius: 10px 10px 0 0;
+}
+.modal-title { font-family: var(--mono); font-size: 12px; font-weight: 700; letter-spacing: 1.5px; color: var(--text1); }
+.modal-close {
+  width: 26px; height: 26px; border-radius: 6px; border: 1px solid var(--border);
+  background: var(--bg1); color: var(--text1); cursor: pointer;
+  font-size: 16px; line-height: 1; display: flex; align-items: center; justify-content: center;
+}
+.modal-close:hover { background: var(--red); border-color: var(--red); color: #fff; }
+.modal-content { padding: 22px 28px; overflow-y: auto; line-height: 1.6; }
+
+/* ─── Markdown body ─── */
+.markdown-body { color: var(--text0); font-family: var(--sans); font-size: 14px; }
+.markdown-body h1 { font-size: 22px; margin: 0 0 14px; }
+.markdown-body h2 { font-size: 17px; margin: 22px 0 10px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+.markdown-body h3 { font-size: 14px; margin: 18px 0 8px; color: var(--text0); }
+.markdown-body p { margin: 0 0 12px; }
+.markdown-body ul, .markdown-body ol { margin: 0 0 12px 22px; }
+.markdown-body li { margin: 4px 0; }
+.markdown-body code {
+  font-family: var(--mono); font-size: 12px; padding: 2px 5px;
+  background: var(--bg2); border: 1px solid var(--border); border-radius: 4px; color: var(--text0);
+}
+.markdown-body pre {
+  background: var(--bg0); border: 1px solid var(--border); border-radius: 6px;
+  padding: 12px 14px; overflow-x: auto; margin: 0 0 12px;
+}
+.markdown-body pre code { background: none; border: none; padding: 0; }
+.markdown-body table { width: 100%; border-collapse: collapse; margin: 0 0 12px; font-size: 13px; }
+.markdown-body th, .markdown-body td { padding: 8px 10px; border: 1px solid var(--border); text-align: left; }
+.markdown-body th { background: var(--bg2); color: var(--text1); font-weight: 600; }
+.markdown-body a { color: var(--blue); text-decoration: none; }
+.markdown-body a:hover { text-decoration: underline; }
+.markdown-body strong { color: var(--text0); font-weight: 600; }

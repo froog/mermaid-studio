@@ -51,6 +51,7 @@ const server = http.createServer((req, res) => {
     '/index.html': { file: 'index.html', type: 'text/html; charset=utf-8' },
     '/index.js':   { file: 'index.js',   type: 'application/javascript; charset=utf-8' },
     '/index.css':  { file: 'index.css',  type: 'text/css; charset=utf-8' },
+    '/HELP.md':    { file: 'HELP.md',    type: 'text/markdown; charset=utf-8' },
   };
   if (req.method === 'GET' && STATIC[req.url]) {
     const { file, type } = STATIC[req.url];

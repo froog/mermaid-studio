@@ -524,6 +524,29 @@
     return `${mo} ${d.getDate()} ${h}:${m}${ampm}`;
   }
 
+  // ─── Help modal ───
+  const helpModal = document.getElementById('help-modal');
+  const helpContent = document.getElementById('help-content');
+  let helpLoaded = false;
+
+  async function openHelp() {
+    helpModal.hidden = false;
+    if (helpLoaded) return;
+    try {
+      const res = await fetch('/HELP.md');
+      const md = await res.text();
+      helpContent.innerHTML = window.marked ? window.marked.parse(md) : `<pre>${escapeHtml(md)}</pre>`;
+      helpLoaded = true;
+    } catch {
+      helpContent.textContent = "Couldn't load HELP.md.";
+    }
+  }
+  function closeHelp() { helpModal.hidden = true; }
+
+  document.getElementById('help-btn').addEventListener('click', openHelp);
+  helpModal.addEventListener('click', e => { if (e.target.dataset.close !== undefined) closeHelp(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !helpModal.hidden) closeHelp(); });
+
   // ─── Boot ───
   if (!activeChat.title) activeChat.title = deriveTitle(activeChat);
   setCode(activeChat.code);

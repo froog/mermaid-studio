@@ -1,6 +1,6 @@
 # Mermaid Studio
 
-A browser-based studio for authoring and previewing [Mermaid](https://mermaid.js.org/) diagrams, with AI-assisted generation via [OpenRouter](https://openrouter.ai/).
+A minimal browser-based studio for authoring and previewing [Mermaid](https://mermaid.js.org/) diagrams, with AI-assisted generation via [OpenRouter](https://openrouter.ai/).
 
 The app is a static `index.html` + `index.js` + `index.css` served by a tiny Node.js proxy that forwards requests to OpenRouter's chat completions API (so your API key stays out of the browser).
 
