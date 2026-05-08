@@ -714,13 +714,12 @@
   }
   function fmtTs(ts) {
     const d = new Date(ts);
-    const wd = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()];
     const mo = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()];
     let h = d.getHours();
     const m = String(d.getMinutes()).padStart(2, '0');
     const ampm = h >= 12 ? 'pm' : 'am';
     h = h % 12 || 12;
-    return `${wd} ${mo} ${d.getDate()} ${h}:${m}${ampm}`;
+    return `${mo} ${d.getDate()} ${h}:${m}${ampm}`;
   }
 
   // ─── Boot ───
