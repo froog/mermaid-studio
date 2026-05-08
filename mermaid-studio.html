@@ -285,9 +285,10 @@
     return {
       id: newChatId(),
       title: '',
-      messages: greet ? [{ role: 'assistant', content: GREETING }] : [],
+      messages: [],
       code: code,
       updatedAt: Date.now(),
+      showGreeting: greet,
     };
   }
 
@@ -603,7 +604,10 @@
   // ─── Chat ───
   function renderChat() {
     chatScroll.innerHTML = '';
-    chatMessages.forEach(msg => {
+    const display = (chatMessages.length === 0 && activeChat.showGreeting)
+      ? [{ role: 'assistant', content: GREETING }]
+      : chatMessages;
+    display.forEach(msg => {
       const isUser = msg.role === 'user';
       const row = document.createElement('div');
       row.className = 'msg-row' + (isUser ? ' user' : '');
