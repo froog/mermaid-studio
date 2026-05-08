@@ -45,16 +45,22 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // ─── Serve HTML ───
-  if (req.method === 'GET' && (req.url === '/' || req.url === '/index.html')) {
-    const htmlPath = path.join(__dirname, 'mermaid-studio.html');
-    fs.readFile(htmlPath, (err, data) => {
+  // ─── Serve static files ───
+  const STATIC = {
+    '/':           { file: 'index.html', type: 'text/html; charset=utf-8' },
+    '/index.html': { file: 'index.html', type: 'text/html; charset=utf-8' },
+    '/index.js':   { file: 'index.js',   type: 'application/javascript; charset=utf-8' },
+    '/index.css':  { file: 'index.css',  type: 'text/css; charset=utf-8' },
+  };
+  if (req.method === 'GET' && STATIC[req.url]) {
+    const { file, type } = STATIC[req.url];
+    fs.readFile(path.join(__dirname, file), (err, data) => {
       if (err) {
         res.writeHead(404);
         res.end('File not found');
         return;
       }
-      res.writeHead(200, { 'Content-Type': 'text/html' });
+      res.writeHead(200, { 'Content-Type': type });
       res.end(data);
     });
     return;
