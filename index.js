@@ -1,18 +1,5 @@
 (() => {
   // ─── Data ───
-  const DEFAULT_CODE = `graph TD
-    A[Start] -->|User opens editor| B[Write Mermaid Code]
-    B --> C{Valid Syntax?}
-    C -->|Yes| D[Render Diagram]
-    C -->|No| E[Show Error]
-    E --> B
-    D --> F[Export or Iterate]
-    F --> B
-
-    style A fill:#0d1117,stroke:#58a6ff,color:#c9d1d9
-    style D fill:#238636,stroke:#2ea043,color:#fff
-    style E fill:#da3633,stroke:#f85149,color:#fff`;
-
   const EXAMPLES = [
     { label: "Flowchart", code: `graph LR\n    A[Input] --> B{Decision}\n    B -->|Path 1| C[Process A]\n    B -->|Path 2| D[Process B]\n    C --> E[Output]\n    D --> E` },
     { label: "Sequence", code: `sequenceDiagram\n    participant U as User\n    participant S as Server\n    participant DB as Database\n    U->>S: POST /api/data\n    S->>DB: INSERT query\n    DB-->>S: Success\n    S-->>U: 201 Created` },
@@ -69,6 +56,18 @@
     return `New chat ${hh}:${mm}`;
   }
 
+  function seedChat() {
+    const ex = EXAMPLES[0];
+    const c = makeChat(ex.code, { greet: false });
+    c.title = `Example - ${ex.label}`;
+    c.messages.push({
+      role: 'assistant',
+      content: `Loaded example: ${ex.label}.\n\n\`\`\`mermaid\n${ex.code}\n\`\`\``,
+      ts: Date.now(),
+    });
+    return c;
+  }
+
   function loadStore() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
@@ -79,7 +78,7 @@
         }
       }
     } catch {}
-    const seed = makeChat(DEFAULT_CODE);
+    const seed = seedChat();
     return { activeId: seed.id, chats: { [seed.id]: seed } };
   }
 
@@ -213,7 +212,7 @@
     refreshSelect();
   }
 
-  chatNewBtn.addEventListener('click', () => openChatWith(DEFAULT_CODE));
+  chatNewBtn.addEventListener('click', () => openChatWith(''));
 
   // ─── Load / Download ───
   const loadInput = document.getElementById('load-input');
@@ -251,7 +250,7 @@
     delete store.chats[store.activeId];
     const remaining = Object.keys(store.chats);
     if (remaining.length === 0) {
-      const c = makeChat(DEFAULT_CODE);
+      const c = seedChat();
       store.chats[c.id] = c;
       store.activeId = c.id;
     } else {
