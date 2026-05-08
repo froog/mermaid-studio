@@ -375,7 +375,7 @@
     const i = e.target.value;
     if (i === '') return;
     const ex = EXAMPLES[Number(i)];
-    openChatWith(ex.code, `Example - ${ex.label}`, { greet: false });
+    openChatWith(ex.code, `Example - ${ex.label}`, { greet: false, seedMessage: `Loaded example: ${ex.label}.` });
     exampleSelect.value = '';
   });
 
@@ -449,6 +449,13 @@
   function openChatWith(code, titleHint, opts) {
     const c = makeChat(code, opts);
     if (titleHint) c.title = titleHint;
+    if (opts && opts.seedMessage && code && code.trim()) {
+      c.messages.push({
+        role: 'assistant',
+        content: `${opts.seedMessage}\n\n\`\`\`mermaid\n${code}\n\`\`\``,
+        ts: Date.now(),
+      });
+    }
     store.chats[c.id] = c;
     store.activeId = c.id;
     activeChat = c;
@@ -475,7 +482,7 @@
     const reader = new FileReader();
     reader.onload = () => {
       const text = String(reader.result || '');
-      openChatWith(text, file.name || 'Loaded chat', { greet: false });
+      openChatWith(text, file.name || 'Loaded chat', { greet: false, seedMessage: `Loaded file: ${file.name}.` });
     };
     reader.readAsText(file);
   });
