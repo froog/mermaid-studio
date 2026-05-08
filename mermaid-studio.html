@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mermaid Studio</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg0: #010409;
+    --bg1: #0d1117;
+    --bg2: #161b22;
+    --bg3: #21262d;
+    --border: #30363d;
+    --text0: #c9d1d9;
+    --text1: #8b949e;
+    --text2: #6e7681;
+    --blue: #58a6ff;
+    --green: #3fb950;
+    --orange: #d29922;
+    --red: #f85149;
+    --purple: #bc8cff;
+    --mono: 'JetBrains Mono', monospace;
+    --sans: 'Sora', sans-serif;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; overflow: hidden; }
+  body { background: var(--bg0); color: var(--text0); font-family: var(--sans); }
+
+  textarea:focus, input:focus, button:focus-visible { outline: 1px solid var(--blue); outline-offset: -1px; }
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--bg3); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text2); }
+
+  @keyframes pulse { 0%,100%{opacity:.3} 50%{opacity:1} }
+
+  /* ─── Layout ─── */
+  #app { display: flex; flex-direction: column; height: 100vh; }
+
+  /* ─── Top Bar ─── */
+  .top-bar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 20px; height: 52px; border-bottom: 1px solid var(--border);
+    background: var(--bg1); flex-shrink: 0;
+  }
+  .logo-group { display: flex; align-items: center; gap: 10px; }
+  .logo-text { font-family: var(--mono); font-weight: 700; font-size: 14px; letter-spacing: 1.5px; }
+  .example-bar { display: flex; gap: 6px; }
+  .example-btn {
+    font-family: var(--mono); font-size: 11px; font-weight: 500;
+    padding: 5px 12px; border-radius: 6px; border: 1px solid var(--border);
+    background: var(--bg2); color: var(--text1); cursor: pointer; transition: all .15s;
+  }
+  .example-btn:hover { background: var(--bg3); color: var(--text0); }
+
+  /* ─── Panes ─── */
+  .panes { display: flex; flex: 1; overflow: hidden; }
+
+  .pane-header {
+    display: flex; align-items: center; gap: 8px; padding: 10px 16px;
+    border-bottom: 1px solid var(--border); background: var(--bg2); flex-shrink: 0;
+  }
+  .pane-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .pane-title { font-family: var(--mono); font-size: 11px; font-weight: 700; letter-spacing: 1.2px; color: var(--text1); }
+
+  /* ─── Editor Pane ─── */
+  .editor-pane {
+    width: 30%; min-width: 260px; display: flex; flex-direction: column;
+    border-right: 1px solid var(--border); background: var(--bg1);
+  }
+  .line-count { margin-left: auto; font-family: var(--mono); font-size: 10px; color: var(--text2); }
+  .editor-wrap { display: flex; flex: 1; overflow: auto; }
+  .line-numbers {
+    padding: 14px 0; width: 44px; text-align: right; flex-shrink: 0;
+    background: var(--bg1); border-right: 1px solid var(--border);
+    user-select: none; overflow: hidden;
+  }
+  .line-num { font-family: var(--mono); font-size: 13px; line-height: 21px; color: var(--text2); padding-right: 10px; }
+  #code-editor {
+    flex: 1; padding: 14px 16px; font-family: var(--mono); font-size: 13px; line-height: 21px;
+    background: transparent; color: var(--text0); border: none; resize: none;
+    outline: none; white-space: pre; overflow-wrap: normal; overflow-x: auto; tab-size: 4;
+  }
+
+  /* ─── Diagram Pane ─── */
+  .diagram-pane {
+    width: 40%; display: flex; flex-direction: column;
+    border-right: 1px solid var(--border); background: var(--bg0);
+  }
+  .diagram-content {
+    flex: 1; overflow: auto; display: flex; align-items: center;
+    justify-content: center; padding: 24px;
+  }
+  .diagram-content svg { max-width: 100%; height: auto; }
+  .placeholder { font-family: var(--mono); font-size: 13px; color: var(--text2); }
+  .error-box {
+    padding: 20px; border-radius: 8px; background: rgba(248,81,73,0.08);
+    border: 1px solid rgba(248,81,73,0.25); max-width: 420px;
+  }
+  .error-label { color: var(--red); font-weight: 700; font-size: 13px; }
+  .error-pre {
+    margin-top: 10px; font-family: var(--mono); font-size: 12px; color: var(--text1);
+    white-space: pre-wrap; word-break: break-word;
+  }
+
+  /* ─── Chat Pane ─── */
+  .chat-pane {
+    width: 30%; min-width: 260px; display: flex; flex-direction: column; background: var(--bg1);
+  }
+  .chat-scroll { flex: 1; overflow-y: auto; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
+  .msg-row { display: flex; }
+  .msg-row.user { justify-content: flex-end; }
+  .msg-bubble {
+    max-width: 85%; padding: 10px 14px; font-size: 13px; font-family: var(--sans); line-height: 1.5;
+    white-space: pre-wrap; word-break: break-word;
+  }
+  .msg-bubble.user-bubble { border-radius: 14px 14px 4px 14px; background: var(--blue); color: #fff; }
+  .msg-bubble.ai-bubble { border-radius: 14px 14px 14px 4px; background: var(--bg3); color: var(--text0); }
+  .code-block {
+    margin-top: 8px; border-radius: 8px; overflow: hidden;
+    border: 1px solid var(--border); background: var(--bg0);
+  }
+  .code-block pre {
+    padding: 12px 14px; font-family: var(--mono); font-size: 12px; color: var(--text0);
+    white-space: pre-wrap; word-break: break-word; margin: 0; line-height: 1.6;
+  }
+  .insert-btn {
+    width: 100%; padding: 8px 0; border: none; border-top: 1px solid var(--border);
+    background: var(--bg2); color: var(--blue); font-family: var(--mono); font-size: 12px;
+    font-weight: 600; cursor: pointer; transition: all .15s;
+  }
+  .insert-btn:hover { background: var(--blue); color: #fff; }
+
+  .chat-input-row {
+    display: flex; gap: 8px; padding: 12px 14px;
+    border-top: 1px solid var(--border); background: var(--bg2);
+  }
+  #chat-input {
+    flex: 1; padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--bg1); color: var(--text0); font-family: var(--sans); font-size: 13px; outline: none;
+  }
+  .send-btn {
+    width: 40px; height: 40px; border-radius: 8px; border: none;
+    background: var(--bg3); color: var(--text0); font-size: 18px; font-weight: 700;
+    cursor: pointer; transition: all .15s; display: flex; align-items: center; justify-content: center;
+  }
+  .send-btn:hover:not(:disabled) { background: var(--blue); }
+  .loading-dots { font-family: var(--mono); font-size: 14px; color: var(--text2); animation: pulse 1.2s ease-in-out infinite; }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <!-- Top Bar -->
+  <header class="top-bar">
+    <div class="logo-group">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>
+      </svg>
+      <span class="logo-text">MERMAID STUDIO</span>
+    </div>
+    <div class="example-bar" id="example-bar"></div>
+  </header>
+
+  <!-- Three Panes -->
+  <div class="panes">
+    <!-- Editor -->
+    <div class="editor-pane">
+      <div class="pane-header">
+        <span class="pane-dot" style="background:var(--orange)"></span>
+        <span class="pane-title">EDITOR</span>
+        <span class="line-count" id="line-count">0 lines</span>
+      </div>
+      <div class="editor-wrap">
+        <div class="line-numbers" id="line-numbers" aria-hidden="true"></div>
+        <textarea id="code-editor" spellcheck="false"></textarea>
+      </div>
+    </div>
+
+    <!-- Preview -->
+    <div class="diagram-pane">
+      <div class="pane-header">
+        <span class="pane-dot" style="background:var(--green)"></span>
+        <span class="pane-title">PREVIEW</span>
+      </div>
+      <div class="diagram-content" id="diagram-content">
+        <span class="placeholder">Loading Mermaid…</span>
+      </div>
+    </div>
+
+    <!-- Chat -->
+    <div class="chat-pane">
+      <div class="pane-header">
+        <span class="pane-dot" style="background:var(--blue)"></span>
+        <span class="pane-title">AI ASSISTANT</span>
+      </div>
+      <div class="chat-scroll" id="chat-scroll"></div>
+      <div class="chat-input-row">
+        <input id="chat-input" placeholder="Describe a diagram…">
+        <button class="send-btn" id="send-btn">↑</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/11.4.1/mermaid.min.js"></script>
+<script>
+(() => {
+  // ─── Data ───
+  const DEFAULT_CODE = `graph TD
+    A[Start] -->|User opens editor| B[Write Mermaid Code]
+    B --> C{Valid Syntax?}
+    C -->|Yes| D[Render Diagram]
+    C -->|No| E[Show Error]
+    E --> B
+    D --> F[Export or Iterate]
+    F --> B
+
+    style A fill:#0d1117,stroke:#58a6ff,color:#c9d1d9
+    style D fill:#238636,stroke:#2ea043,color:#fff
+    style E fill:#da3633,stroke:#f85149,color:#fff`;
+
+  const EXAMPLES = [
+    { label: "Flowchart", code: `graph LR\n    A[Input] --> B{Decision}\n    B -->|Path 1| C[Process A]\n    B -->|Path 2| D[Process B]\n    C --> E[Output]\n    D --> E` },
+    { label: "Sequence", code: `sequenceDiagram\n    participant U as User\n    participant S as Server\n    participant DB as Database\n    U->>S: POST /api/data\n    S->>DB: INSERT query\n    DB-->>S: Success\n    S-->>U: 201 Created` },
+    { label: "Class Diagram", code: `classDiagram\n    class Animal {\n        +String name\n        +int age\n        +makeSound()\n    }\n    class Dog {\n        +String breed\n        +fetch()\n    }\n    class Cat {\n        +bool indoor\n        +purr()\n    }\n    Animal <|-- Dog\n    Animal <|-- Cat` },
+    { label: "State", code: `stateDiagram-v2\n    [*] --> Idle\n    Idle --> Loading : fetch()\n    Loading --> Success : 200 OK\n    Loading --> Error : 4xx/5xx\n    Success --> Idle : reset\n    Error --> Loading : retry\n    Error --> Idle : cancel` },
+    { label: "Gantt", code: `gantt\n    title Project Timeline\n    dateFormat YYYY-MM-DD\n    section Design\n        Wireframes     :done, d1, 2025-01-01, 7d\n        Mockups        :active, d2, after d1, 5d\n    section Development\n        Frontend       :d3, after d2, 10d\n        Backend        :d4, after d2, 12d\n    section Testing\n        QA             :d5, after d4, 5d` },
+  ];
+
+  // ─── DOM refs ───
+  const editor = document.getElementById('code-editor');
+  const lineNumbers = document.getElementById('line-numbers');
+  const lineCount = document.getElementById('line-count');
+  const diagramContent = document.getElementById('diagram-content');
+  const chatScroll = document.getElementById('chat-scroll');
+  const chatInput = document.getElementById('chat-input');
+  const sendBtn = document.getElementById('send-btn');
+  const exampleBar = document.getElementById('example-bar');
+
+  // ─── State ───
+  let chatMessages = [
+    { role: 'assistant', content: "I can help you create Mermaid diagrams. Describe what you need — a flowchart, sequence diagram, ER diagram, etc. — and I'll generate the code." }
+  ];
+  let chatLoading = false;
+  let renderTimer = null;
+  let renderId = 0;
+
+  // ─── Init Mermaid ───
+  mermaid.initialize({
+    startOnLoad: false,
+    theme: 'dark',
+    themeVariables: {
+      darkMode: true, background: '#0d1117', primaryColor: '#1f6feb',
+      primaryTextColor: '#c9d1d9', primaryBorderColor: '#30363d',
+      lineColor: '#484f58', secondaryColor: '#161b22', tertiaryColor: '#21262d',
+    },
+    flowchart: { curve: 'basis' },
+    securityLevel: 'loose',
+  });
+
+  // ─── Example buttons ───
+  EXAMPLES.forEach(ex => {
+    const btn = document.createElement('button');
+    btn.className = 'example-btn';
+    btn.textContent = ex.label;
+    btn.addEventListener('click', () => setCode(ex.code));
+    exampleBar.appendChild(btn);
+  });
+
+  // ─── Editor ───
+  function setCode(code) {
+    editor.value = code;
+    updateLineNumbers();
+    scheduleRender();
+  }
+
+  function updateLineNumbers() {
+    const lines = editor.value.split('\n');
+    lineCount.textContent = lines.length + ' lines';
+    lineNumbers.innerHTML = lines.map((_, i) => `<div class="line-num">${i + 1}</div>`).join('');
+  }
+
+  editor.addEventListener('input', () => { updateLineNumbers(); scheduleRender(); });
+  editor.addEventListener('scroll', () => { lineNumbers.scrollTop = editor.scrollTop; });
+  editor.addEventListener('keydown', e => {
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      const start = editor.selectionStart;
+      const end = editor.selectionEnd;
+      editor.value = editor.value.substring(0, start) + '    ' + editor.value.substring(end);
+      editor.selectionStart = editor.selectionEnd = start + 4;
+      updateLineNumbers();
+      scheduleRender();
+    }
+  });
+
+  // ─── Diagram Rendering ───
+  function scheduleRender() {
+    clearTimeout(renderTimer);
+    renderTimer = setTimeout(renderDiagram, 400);
+  }
+
+  async function renderDiagram() {
+    const code = editor.value.trim();
+    if (!code) {
+      diagramContent.innerHTML = '<span class="placeholder">Start typing to see your diagram…</span>';
+      return;
+    }
+    const id = ++renderId;
+    try {
+      const uniqueId = `mmd-${Date.now()}`;
+      const { svg } = await mermaid.render(uniqueId, code);
+      if (id === renderId) {
+        diagramContent.innerHTML = `<div style="width:100%;display:flex;justify-content:center;align-items:center">${svg}</div>`;
+      }
+    } catch (e) {
+      if (id === renderId) {
+        diagramContent.innerHTML = `<div class="error-box"><span class="error-label">⚠ SYNTAX ERROR</span><pre class="error-pre">${escapeHtml(e.message || 'Syntax error')}</pre></div>`;
+      }
+      document.querySelectorAll('[id^="dmmd-"]').forEach(el => el.remove());
+    }
+  }
+
+  // ─── Chat ───
+  function renderChat() {
+    chatScroll.innerHTML = '';
+    chatMessages.forEach(msg => {
+      const isUser = msg.role === 'user';
+      const row = document.createElement('div');
+      row.className = 'msg-row' + (isUser ? ' user' : '');
+
+      const bubble = document.createElement('div');
+      bubble.className = 'msg-bubble ' + (isUser ? 'user-bubble' : 'ai-bubble');
+
+      // Parse mermaid code blocks
+      const parts = msg.content.split(/(```mermaid[\s\S]*?```)/g);
+      parts.forEach(part => {
+        const match = part.match(/^```mermaid\n?([\s\S]*?)```$/);
+        if (match) {
+          const code = match[1].trim();
+          const block = document.createElement('div');
+          block.className = 'code-block';
+          const pre = document.createElement('pre');
+          pre.textContent = code;
+          block.appendChild(pre);
+          const btn = document.createElement('button');
+          btn.className = 'insert-btn';
+          btn.textContent = '↗ Insert into Editor';
+          btn.addEventListener('click', () => setCode(code));
+          block.appendChild(btn);
+          bubble.appendChild(block);
+        } else if (part.trim()) {
+          const span = document.createElement('span');
+          span.style.whiteSpace = 'pre-wrap';
+          span.textContent = part;
+          bubble.appendChild(span);
+        }
+      });
+
+      row.appendChild(bubble);
+      chatScroll.appendChild(row);
+    });
+
+    if (chatLoading) {
+      const row = document.createElement('div');
+      row.className = 'msg-row';
+      row.innerHTML = '<div class="msg-bubble ai-bubble"><span class="loading-dots">●●●</span></div>';
+      chatScroll.appendChild(row);
+    }
+
+    chatScroll.scrollTop = chatScroll.scrollHeight;
+  }
+
+  async function sendMessage() {
+    const text = chatInput.value.trim();
+    if (!text || chatLoading) return;
+    chatInput.value = '';
+
+    chatMessages.push({ role: 'user', content: text });
+    chatLoading = true;
+    renderChat();
+
+    try {
+      const apiMessages = chatMessages
+        .filter(m => m.role !== 'system')
+        .map(m => ({ role: m.role, content: m.content }));
+
+      const res = await fetch('/api/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 1000,
+          system: 'You are a Mermaid diagram assistant inside a live editor. When asked to create or modify a diagram, respond with ONLY a valid mermaid code block wrapped in triple backticks with "mermaid" language tag. Keep explanations minimal — one short sentence before the code block at most. If the user asks a non-diagram question, answer briefly. Always output valid Mermaid syntax.',
+          messages: apiMessages,
+        }),
+      });
+      const data = await res.json();
+      const reply = data.content?.map(b => b.text || '').join('\n') || 'Sorry, something went wrong.';
+      chatMessages.push({ role: 'assistant', content: reply });
+    } catch {
+      chatMessages.push({ role: 'assistant', content: "Network error — couldn't reach the AI." });
+    }
+
+    chatLoading = false;
+    renderChat();
+  }
+
+  sendBtn.addEventListener('click', sendMessage);
+  chatInput.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) sendMessage(); });
+
+  // ─── Utility ───
+  function escapeHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // ─── Boot ───
+  setCode(DEFAULT_CODE);
+  renderChat();
+})();
+</script>
+</body>
+</html>
