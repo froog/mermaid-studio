@@ -46,7 +46,13 @@
   }
   .logo-group { display: flex; align-items: center; gap: 10px; }
   .logo-text { font-family: var(--mono); font-weight: 700; font-size: 14px; letter-spacing: 1.5px; }
-  .example-bar { display: flex; gap: 6px; }
+  .example-bar { display: flex; gap: 6px; margin-left: auto; }
+  .example-select {
+    font-family: var(--mono); font-size: 11px; font-weight: 500;
+    padding: 5px 12px; border-radius: 6px; border: 1px solid var(--border);
+    background: var(--bg2); color: var(--text1); cursor: pointer; outline: none;
+  }
+  .example-select:hover { background: var(--bg3); color: var(--text0); }
   .file-bar { display: flex; gap: 6px; margin-left: 8px; padding-left: 12px; border-left: 1px solid var(--border); }
   .example-btn {
     font-family: var(--mono); font-size: 11px; font-weight: 500;
@@ -189,7 +195,11 @@
       </svg>
       <span class="logo-text">MERMAID STUDIO</span>
     </div>
-    <div class="example-bar" id="example-bar"></div>
+    <div class="example-bar">
+      <select id="example-select" class="example-select" aria-label="Insert example">
+        <option value="">Examples ▾</option>
+      </select>
+    </div>
     <div class="file-bar">
       <button class="example-btn" id="load-btn" title="Upload a .mmd file into a new chat">↑ Upload</button>
       <button class="example-btn" id="download-btn" title="Download editor contents">↓ Download</button>
@@ -274,7 +284,7 @@
   const chatScroll = document.getElementById('chat-scroll');
   const chatInput = document.getElementById('chat-input');
   const sendBtn = document.getElementById('send-btn');
-  const exampleBar = document.getElementById('example-bar');
+  const exampleSelect = document.getElementById('example-select');
   const chatSelect = document.getElementById('chat-select');
   const chatNewBtn = document.getElementById('chat-new');
   const chatDelBtn = document.getElementById('chat-del');
@@ -349,13 +359,18 @@
     securityLevel: 'loose',
   });
 
-  // ─── Example buttons ───
-  EXAMPLES.forEach(ex => {
-    const btn = document.createElement('button');
-    btn.className = 'example-btn';
-    btn.textContent = ex.label;
-    btn.addEventListener('click', () => setCode(ex.code));
-    exampleBar.appendChild(btn);
+  // ─── Example dropdown ───
+  EXAMPLES.forEach((ex, i) => {
+    const opt = document.createElement('option');
+    opt.value = String(i);
+    opt.textContent = ex.label;
+    exampleSelect.appendChild(opt);
+  });
+  exampleSelect.addEventListener('change', e => {
+    const i = e.target.value;
+    if (i === '') return;
+    setCode(EXAMPLES[Number(i)].code);
+    exampleSelect.value = '';
   });
 
   // ─── Editor ───
