@@ -374,7 +374,8 @@
   exampleSelect.addEventListener('change', e => {
     const i = e.target.value;
     if (i === '') return;
-    setCode(EXAMPLES[Number(i)].code);
+    const ex = EXAMPLES[Number(i)];
+    openChatWith(ex.code, `Example - ${ex.label}`, { greet: false });
     exampleSelect.value = '';
   });
 
