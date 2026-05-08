@@ -752,6 +752,8 @@
       const data = await res.json();
       const reply = data.choices?.[0]?.message?.content || 'Sorry, something went wrong.';
       chatMessages.push({ role: 'assistant', content: reply, ts: Date.now() });
+      const m = reply.match(/```mermaid\n?([\s\S]*?)```/);
+      if (m) setCode(m[1].trim());
     } catch {
       chatMessages.push({ role: 'assistant', content: "Network error — couldn't reach the AI.", ts: Date.now() });
     }
