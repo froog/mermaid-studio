@@ -1,4 +1,7 @@
 (() => {
+  // ─── Config ───
+  const MODEL = 'anthropic/claude-sonnet-4.5';
+
   // ─── Data ───
   const EXAMPLES = [
     { label: "Flowchart", code: `graph LR\n    A[Input] --> B{Decision}\n    B -->|Path 1| C[Process A]\n    B -->|Path 2| D[Process B]\n    C --> E[Output]\n    D --> E` },
@@ -488,7 +491,7 @@
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: 'anthropic/claude-sonnet-4.5',
+          model: MODEL,
           max_tokens: 1000,
           messages: apiMessages,
         }),

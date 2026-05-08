@@ -26,4 +26,4 @@ Then open <http://localhost:3000>.
 
 ## Changing the model
 
-The model is hardcoded as `anthropic/claude-sonnet-4.5` in `index.js`. Swap it for any [OpenRouter model slug](https://openrouter.ai/models) (e.g. `openai/gpt-4o`, `google/gemini-2.5-pro`).
+The model is set via the `MODEL` constant at the top of `index.js` (default `anthropic/claude-sonnet-4.5`). Swap it for any [OpenRouter model slug](https://openrouter.ai/models) (e.g. `openai/gpt-4o`, `google/gemini-2.5-pro`).
