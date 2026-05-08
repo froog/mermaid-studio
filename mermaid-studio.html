@@ -47,6 +47,7 @@
   .logo-group { display: flex; align-items: center; gap: 10px; }
   .logo-text { font-family: var(--mono); font-weight: 700; font-size: 14px; letter-spacing: 1.5px; }
   .example-bar { display: flex; gap: 6px; }
+  .file-bar { display: flex; gap: 6px; margin-left: 8px; padding-left: 12px; border-left: 1px solid var(--border); }
   .example-btn {
     font-family: var(--mono); font-size: 11px; font-weight: 500;
     padding: 5px 12px; border-radius: 6px; border: 1px solid var(--border);
@@ -184,6 +185,11 @@
       <span class="logo-text">MERMAID STUDIO</span>
     </div>
     <div class="example-bar" id="example-bar"></div>
+    <div class="file-bar">
+      <button class="example-btn" id="load-btn" title="Load a .mmd file into a new chat">↑ Load</button>
+      <button class="example-btn" id="download-btn" title="Download editor contents">↓ Download</button>
+      <input type="file" id="load-input" accept=".mmd,.txt,text/plain" style="display:none">
+    </div>
   </header>
 
   <!-- Three Panes -->
@@ -412,8 +418,9 @@
 
   chatSelect.addEventListener('change', e => switchChat(e.target.value));
 
-  chatNewBtn.addEventListener('click', () => {
-    const c = makeChat(DEFAULT_CODE);
+  function openChatWith(code, titleHint) {
+    const c = makeChat(code);
+    if (titleHint) c.title = titleHint;
     store.chats[c.id] = c;
     store.activeId = c.id;
     activeChat = c;
@@ -424,6 +431,40 @@
     scheduleRender();
     renderChat();
     refreshSelect();
+  }
+
+  chatNewBtn.addEventListener('click', () => openChatWith(DEFAULT_CODE));
+
+  // ─── Load / Download ───
+  const loadInput = document.getElementById('load-input');
+  document.getElementById('load-btn').addEventListener('click', () => {
+    loadInput.value = '';
+    loadInput.click();
+  });
+  loadInput.addEventListener('change', () => {
+    const file = loadInput.files && loadInput.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const text = String(reader.result || '');
+      const name = file.name.replace(/\.[^.]+$/, '');
+      openChatWith(text, name || 'Loaded chat');
+    };
+    reader.readAsText(file);
+  });
+
+  document.getElementById('download-btn').addEventListener('click', () => {
+    const text = editor.value;
+    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const safe = (activeChat.title || 'mermaid').replace(/[^\w.-]+/g, '_').slice(0, 40) || 'mermaid';
+    a.href = url;
+    a.download = `${safe}.mmd`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
   });
 
   chatDelBtn.addEventListener('click', () => {
