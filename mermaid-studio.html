@@ -141,6 +141,11 @@
   }
   .msg-bubble.user-bubble { border-radius: 14px 14px 4px 14px; background: var(--blue); color: #fff; }
   .msg-bubble.ai-bubble { border-radius: 14px 14px 14px 4px; background: var(--bg3); color: var(--text0); }
+  .msg-ts {
+    display: block; font-family: var(--mono); font-size: 9px;
+    color: var(--text2); margin-bottom: 4px; letter-spacing: 0.3px;
+  }
+  .msg-bubble.user-bubble .msg-ts { color: rgba(255,255,255,0.7); }
   .code-block {
     margin-top: 8px; border-radius: 8px; overflow: hidden;
     border: 1px solid var(--border); background: var(--bg0);
@@ -615,6 +620,13 @@
       const bubble = document.createElement('div');
       bubble.className = 'msg-bubble ' + (isUser ? 'user-bubble' : 'ai-bubble');
 
+      if (msg.ts) {
+        const ts = document.createElement('span');
+        ts.className = 'msg-ts';
+        ts.textContent = fmtTs(msg.ts);
+        bubble.appendChild(ts);
+      }
+
       // Parse mermaid code blocks
       const parts = msg.content.split(/(```mermaid[\s\S]*?```)/g);
       parts.forEach(part => {
@@ -659,7 +671,7 @@
     if (!text || chatLoading) return;
     chatInput.value = '';
 
-    chatMessages.push({ role: 'user', content: text });
+    chatMessages.push({ role: 'user', content: text, ts: Date.now() });
     chatLoading = true;
     persist();
     renderChat();
@@ -683,9 +695,9 @@
       });
       const data = await res.json();
       const reply = data.choices?.[0]?.message?.content || 'Sorry, something went wrong.';
-      chatMessages.push({ role: 'assistant', content: reply });
+      chatMessages.push({ role: 'assistant', content: reply, ts: Date.now() });
     } catch {
-      chatMessages.push({ role: 'assistant', content: "Network error — couldn't reach the AI." });
+      chatMessages.push({ role: 'assistant', content: "Network error — couldn't reach the AI.", ts: Date.now() });
     }
 
     chatLoading = false;
@@ -699,6 +711,16 @@
   // ─── Utility ───
   function escapeHtml(s) {
     return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+  function fmtTs(ts) {
+    const d = new Date(ts);
+    const wd = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()];
+    const mo = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()];
+    let h = d.getHours();
+    const m = String(d.getMinutes()).padStart(2, '0');
+    const ampm = h >= 12 ? 'pm' : 'am';
+    h = h % 12 || 12;
+    return `${wd} ${mo} ${d.getDate()} ${h}:${m}${ampm}`;
   }
 
   // ─── Boot ───
