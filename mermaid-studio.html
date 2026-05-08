@@ -274,6 +274,7 @@
     { label: "Class Diagram", code: `classDiagram\n    class Animal {\n        +String name\n        +int age\n        +makeSound()\n    }\n    class Dog {\n        +String breed\n        +fetch()\n    }\n    class Cat {\n        +bool indoor\n        +purr()\n    }\n    Animal <|-- Dog\n    Animal <|-- Cat` },
     { label: "State", code: `stateDiagram-v2\n    [*] --> Idle\n    Idle --> Loading : fetch()\n    Loading --> Success : 200 OK\n    Loading --> Error : 4xx/5xx\n    Success --> Idle : reset\n    Error --> Loading : retry\n    Error --> Idle : cancel` },
     { label: "Gantt", code: `gantt\n    title Project Timeline\n    dateFormat YYYY-MM-DD\n    section Design\n        Wireframes     :done, d1, 2025-01-01, 7d\n        Mockups        :active, d2, after d1, 5d\n    section Development\n        Frontend       :d3, after d2, 10d\n        Backend        :d4, after d2, 12d\n    section Testing\n        QA             :d5, after d4, 5d` },
+    { label: "Sankey", code: `sankey-beta\n\nsource,target,value\nSalary,Rent,1200\nSalary,Food,500\nSalary,Savings,800\nSalary,Other,300\nFood,Groceries,350\nFood,Dining,150` },
   ];
 
   // ─── DOM refs ───
