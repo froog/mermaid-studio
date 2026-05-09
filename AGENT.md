@@ -16,6 +16,7 @@ Working notes for AI agents (and humans) maintaining this repo.
 - File `↑ Upload` (any text → new chat titled with filename, seeded with diagram message) and `↓ Download` (saves editor as `<chat-title>.mmd`).
 - Help modal: `?` button → fetches `HELP.md`, renders with marked, Esc/×/backdrop to close.
 - `MODEL` constant at top of `index.js` for swapping the OpenRouter model.
+- Interactive preview: right-click rendered SVG nodes/edges/clusters → context menu. Bidirectional hover between gutter and SVG (`data-ms-id` attribute links them). Source map (`renderState`) rebuilt on every successful render.
 
 ## Conventions
 
@@ -26,6 +27,8 @@ Working notes for AI agents (and humans) maintaining this repo.
 - Greeting message is **ephemeral** (UI only, never persisted). The `showGreeting` flag distinguishes new-chat from file/example seeding.
 - Auto-applying replies relies on the first ` ```mermaid ` block in the assistant message. Don't change that contract without updating both ends.
 - Prompt tweaks live in `sendMessage()`; they include scope guardrails and Mermaid label-quoting rules — don't drop those.
+- SVG is inserted via `document.createRange().createContextualFragment(svg)` (not innerHTML) to satisfy the security hook. Do not revert to innerHTML assignment.
+- **Known regression:** context-menu edits call `setCode()` which replaces `editor.value`, blowing the textarea undo stack. `Cmd-Z` will not undo menu edits. Fix later with `document.execCommand('insertText')` per operation.
 
 ## Changelog
 
@@ -61,14 +64,12 @@ Working notes for AI agents (and humans) maintaining this repo.
 
 <!-- Add ideas, bugs, or planned work below. Keep terse. -->
 
-- [ ] 
-- [ ]
-- [ ]
+- [ ] Verify/fix `domIdToSourceId` for each diagram type by inspecting actual mermaid 11.14.0 SVG output in DevTools — node/edge id prefixes may differ from assumptions.
+- [ ] Extend hover + context menu to sequence, gantt, sankey, radar, xychart (need bespoke parsers).
+- [ ] Fix undo-stack regression: replace `setCode()` calls in rewrite ops with `document.execCommand('insertText')` equivalents.
 
 ### Ideas / known gaps
 
-<!-- Looser bucket for things not yet committed to. -->
-
-- 
-- 
-- 
+- Context menu multi-select (e.g. wrap multiple nodes in subgraph) — deferred.
+- In-textarea-body hover (mouse Y / lineHeight) — deferred; gutter hover ships first.
+- Keyboard navigation of context menu — mouse-only in v1.

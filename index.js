@@ -97,6 +97,8 @@
   let chatLoading = false;
   let renderTimer = null;
   let renderId = 0;
+  let renderState = null;
+  let pendingEdge = null;
 
   // ─── Init Mermaid ───
   mermaid.initialize({
@@ -137,7 +139,14 @@
   function updateLineNumbers() {
     const lines = editor.value.split('\n');
     lineCount.textContent = lines.length + ' lines';
-    lineNumbers.innerHTML = lines.map((_, i) => `<div class="line-num">${i + 1}</div>`).join('');
+    lineNumbers.textContent = '';
+    for (let i = 0; i < lines.length; i++) {
+      const d = document.createElement('div');
+      d.className = 'line-num';
+      d.dataset.line = i;
+      d.textContent = i + 1;
+      lineNumbers.appendChild(d);
+    }
   }
 
   editor.addEventListener('input', () => { updateLineNumbers(); scheduleRender(); persist(); });
@@ -270,6 +279,260 @@
     refreshSelect();
   });
 
+  // ─── Source Map ───
+
+  function detectDiagramType(code) {
+    const first = code.split('\n').find(l => l.trim() && !l.trim().startsWith('%%'));
+    if (!first) return 'other';
+    const t = first.trim().toLowerCase();
+    if (t.startsWith('graph ') || t.startsWith('flowchart ')) return 'flowchart';
+    if (t.startsWith('statediagram')) return 'state';
+    if (t.startsWith('classdiagram')) return 'class';
+    if (t.startsWith('architecture')) return 'architecture';
+    return 'other';
+  }
+
+  function stripComments(lines) {
+    const out = [];
+    let inInit = false;
+    for (let i = 0; i < lines.length; i++) {
+      const t = lines[i].trim();
+      if (!inInit && t.startsWith('%%{')) { inInit = true; out.push(null); continue; }
+      if (inInit) { out.push(null); if (t.endsWith('}%%')) inInit = false; continue; }
+      if (t.startsWith('%%')) { out.push(null); continue; }
+      out.push(lines[i]);
+    }
+    return out;
+  }
+
+  const EDGE_RE = /(--+>|--+|==+>|==+|-\.+->|-\.+-|<-->|<==>|--\|>|<\|--|o--|--o|\*--|--\*)/;
+  const NODE_OPEN = /^([A-Za-z_][\w-]*)(\[|\(|\{|>|\[\[|\(\[|\(\(|\{\{)/;
+  const BRACKET_PAIRS = {
+    '[': ']', '(': ')', '{': '}', '>': ']',
+    '[[': ']]', '([': '])', '((': '))', '{{': '}}',
+  };
+
+  function parseFlowchart(lines, masked) {
+    const byId = new Map();
+    const byLine = new Map();
+
+    function addEntry(id, entry) {
+      if (!byId.has(id)) byId.set(id, entry);
+      const bucket = byLine.get(entry.line) || [];
+      bucket.push(id);
+      byLine.set(entry.line, bucket);
+    }
+
+    let subgraphDepth = 0;
+    for (let i = 0; i < masked.length; i++) {
+      if (masked[i] === null) continue;
+      const raw = masked[i];
+      const t = raw.trim();
+      if (!t || t.startsWith('graph ') || t.startsWith('flowchart ')) continue;
+
+      if (t.startsWith('subgraph')) {
+        const m = t.match(/^subgraph\s+([\w-]+)/);
+        if (m) addEntry(m[1], { kind: 'cluster', line: i, raw: t });
+        subgraphDepth++;
+        continue;
+      }
+      if (t === 'end') { subgraphDepth--; continue; }
+      if (t.startsWith('style ') || t.startsWith('classDef ') || t.startsWith('class ') || t.startsWith('linkStyle ') || t.startsWith('direction ')) continue;
+
+      // Strip quoted labels to avoid false matches: replace "..." with "___"
+      const stripped = t.replace(/"[^"]*"/g, m => '"' + '_'.repeat(m.length - 2) + '"');
+
+      if (EDGE_RE.test(stripped)) {
+        // Could be an edge line or chained edges. Split on operators.
+        const parts = stripped.split(EDGE_RE);
+        // parts: [left, op, right, op, right, ...]
+        let prev = null;
+        for (let p = 0; p < parts.length; p++) {
+          const seg = parts[p].trim().replace(/\|[^|]*\|/, '').trim(); // strip edge labels |x|
+          if (EDGE_RE.test(parts[p])) {
+            // it's an operator — record edge
+            if (prev !== null) {
+              // next segment is the target node
+              let nextSeg = '';
+              for (let q = p + 1; q < parts.length; q++) {
+                if (!EDGE_RE.test(parts[q])) { nextSeg = parts[q].trim().replace(/\|[^|]*\|/, '').trim(); break; }
+              }
+              const fromId = prev.match(NODE_OPEN) ? prev.match(NODE_OPEN)[1] : prev.split(/[\[\(\{>]/)[0].trim();
+              const toRaw = nextSeg.match(NODE_OPEN) ? nextSeg.match(NODE_OPEN)[1] : nextSeg.split(/[\[\(\{>]/)[0].trim();
+              if (fromId && toRaw) {
+                const edgeKey = fromId + '-' + toRaw;
+                addEntry(edgeKey, { kind: 'edge', line: i, raw: t, from: fromId, to: toRaw });
+                // Also register nodes if not seen
+                if (!byId.has(fromId)) addEntry(fromId, { kind: 'node', line: i, raw: t });
+                if (!byId.has(toRaw)) addEntry(toRaw, { kind: 'node', line: i, raw: t });
+              }
+            }
+          } else if (seg) {
+            prev = seg;
+            // Try to register a node definition inline
+            const nm = seg.match(NODE_OPEN);
+            if (nm && !byId.has(nm[1])) {
+              addEntry(nm[1], { kind: 'node', line: i, raw: t });
+            }
+          }
+        }
+      } else {
+        // Pure node definition line
+        const nm = t.match(NODE_OPEN);
+        if (nm) addEntry(nm[1], { kind: 'node', line: i, raw: t });
+      }
+    }
+    return { byId, byLine };
+  }
+
+  function parseState(lines, masked) {
+    const byId = new Map();
+    const byLine = new Map();
+    function add(id, entry) {
+      if (!byId.has(id)) byId.set(id, entry);
+      const b = byLine.get(entry.line) || []; b.push(id); byLine.set(entry.line, b);
+    }
+    for (let i = 0; i < masked.length; i++) {
+      if (masked[i] === null) continue;
+      const t = masked[i].trim();
+      if (!t || t.startsWith('stateDiagram')) continue;
+      const trans = t.match(/^(\S+)\s*-->\s*(\S+)/);
+      if (trans) {
+        const [, from, to] = trans;
+        if (!byId.has(from)) add(from, { kind: 'node', line: i, raw: t });
+        if (!byId.has(to)) add(to, { kind: 'node', line: i, raw: t });
+        add(from + '-' + to, { kind: 'edge', line: i, raw: t, from, to });
+        continue;
+      }
+      const stateAs = t.match(/^state\s+"[^"]*"\s+as\s+(\w+)/);
+      if (stateAs) { add(stateAs[1], { kind: 'node', line: i, raw: t }); continue; }
+      const stateBlock = t.match(/^state\s+(\w+)\s*\{/);
+      if (stateBlock) { add(stateBlock[1], { kind: 'cluster', line: i, raw: t }); }
+    }
+    return { byId, byLine };
+  }
+
+  function parseClass(lines, masked) {
+    const byId = new Map();
+    const byLine = new Map();
+    function add(id, entry) {
+      if (!byId.has(id)) byId.set(id, entry);
+      const b = byLine.get(entry.line) || []; b.push(id); byLine.set(entry.line, b);
+    }
+    for (let i = 0; i < masked.length; i++) {
+      if (masked[i] === null) continue;
+      const t = masked[i].trim();
+      if (!t || t.startsWith('classDiagram')) continue;
+      const classDef = t.match(/^class\s+(\w+)/);
+      if (classDef) { add(classDef[1], { kind: 'node', line: i, raw: t }); continue; }
+      const rel = t.match(/^(\w+)\s*(<\|--|--\|>|\*--|--\*|o--|--o|<--|-->|--)\s*(\w+)/);
+      if (rel) {
+        const [, from, , to] = rel;
+        if (!byId.has(from)) add(from, { kind: 'node', line: i, raw: t });
+        if (!byId.has(to)) add(to, { kind: 'node', line: i, raw: t });
+        add(from + '-' + to, { kind: 'edge', line: i, raw: t, from, to });
+      }
+    }
+    return { byId, byLine };
+  }
+
+  function parseArchitecture(lines, masked) {
+    const byId = new Map();
+    const byLine = new Map();
+    function add(id, entry) {
+      if (!byId.has(id)) byId.set(id, entry);
+      const b = byLine.get(entry.line) || []; b.push(id); byLine.set(entry.line, b);
+    }
+    for (let i = 0; i < masked.length; i++) {
+      if (masked[i] === null) continue;
+      const t = masked[i].trim();
+      if (!t || t.startsWith('architecture')) continue;
+      const grp = t.match(/^group\s+(\w+)/);
+      if (grp) { add(grp[1], { kind: 'cluster', line: i, raw: t }); continue; }
+      const svc = t.match(/^service\s+(\w+)/);
+      if (svc) { add(svc[1], { kind: 'node', line: i, raw: t }); continue; }
+      const edge = t.match(/^(\w+):[A-Z]+\s*--\s*[A-Z]+:(\w+)/);
+      if (edge) {
+        const [, from, to] = edge;
+        add(from + '-' + to, { kind: 'edge', line: i, raw: t, from, to });
+      }
+    }
+    return { byId, byLine };
+  }
+
+  function buildSourceMap(code) {
+    const lines = code.split('\n');
+    const masked = stripComments(lines);
+    const diagramType = detectDiagramType(code);
+    let byId = new Map(), byLine = new Map();
+    if (diagramType === 'flowchart') ({ byId, byLine } = parseFlowchart(lines, masked));
+    else if (diagramType === 'state') ({ byId, byLine } = parseState(lines, masked));
+    else if (diagramType === 'class') ({ byId, byLine } = parseClass(lines, masked));
+    else if (diagramType === 'architecture') ({ byId, byLine } = parseArchitecture(lines, masked));
+    renderState = { diagramType, byElementId: byId, byLine, sourceLines: lines };
+  }
+
+  // Convert a mermaid SVG element's DOM id to the source identifier used in the map.
+  // domId here is already stripped of the "mmd-{ts}-" timestamp prefix.
+  function domIdToSourceId(domId, diagramType) {
+    if (!domId) return null;
+    if (diagramType === 'flowchart') {
+      // "flowchart-A-0" → "A"
+      const nodeM = domId.match(/^flowchart-(.+)-\d+$/);
+      if (nodeM) return nodeM[1];
+      return domId;
+    }
+    if (diagramType === 'state') {
+      const m = domId.match(/^stateDiagram-(.+)-\d+$/) || domId.match(/^state-(.+)-\d+$/);
+      return m ? m[1] : domId;
+    }
+    if (diagramType === 'class') {
+      const m = domId.match(/^classId-(.+)-\d+$/) || domId.match(/^classDef-(.+)-\d+$/);
+      return m ? m[1] : domId;
+    }
+    if (diagramType === 'architecture') {
+      const m = domId.match(/^architecture-(.+)-\d+$/);
+      return m ? m[1] : domId;
+    }
+    return domId;
+  }
+
+  // After render, tag every interactive SVG element with data-ms-id for reliable lookup.
+  // Mermaid 11 actual SVG format (discovered by inspection):
+  //   Nodes: <g class="node default" id="mmd-{ts}-flowchart-{nodeId}-{n}">
+  //   Edges: <g class="label" data-id="L_{from}_{to}_{n}"> inside g.edgeLabel
+  //   Clusters: <g class="cluster" id="mmd-{ts}-flowchart-{clusterId}-{n}">
+  function tagSvgElements() {
+    if (!renderState) return;
+    const svg = getSvg();
+    if (!svg) return;
+    const { diagramType, byElementId } = renderState;
+    let tagged = 0;
+
+    // Nodes and clusters: id="mmd-{digits}-flowchart-{sourceId}-{n}"
+    svg.querySelectorAll('g.node[id], g.cluster[id]').forEach(el => {
+      const bare = el.id.replace(/^mmd-\d+-/, ''); // strip timestamp prefix
+      const sourceId = domIdToSourceId(bare, diagramType);
+      if (sourceId && byElementId.has(sourceId)) { el.dataset.msId = sourceId; tagged++; }
+    });
+
+    // Edge labels: g.label[data-id="L_A_B_0"] — tag parent g.edgeLabel so it's hoverable/clickable
+    svg.querySelectorAll('g.label[data-id]').forEach(el => {
+      const raw = el.dataset.id; // e.g. "L_A_B_0"
+      const m = raw.match(/^L_(.+?)_\d+$/);
+      if (m) {
+        // Convert underscores to hyphens to match source map key format
+        const key = m[1].replace(/_/g, '-');
+        if (byElementId.has(key)) {
+          const target = el.closest('g.edgeLabel') || el.parentElement;
+          if (target) { target.dataset.msId = key; tagged++; }
+        }
+      }
+    });
+
+    console.debug('[ms] tagged', tagged, 'SVG elements; map size:', byElementId.size);
+  }
+
   // ─── Diagram Rendering ───
   function scheduleRender() {
     clearTimeout(renderTimer);
@@ -279,20 +542,41 @@
   async function renderDiagram() {
     const code = editor.value.trim();
     if (!code) {
-      diagramContent.innerHTML = '<span class="placeholder">Start typing to see your diagram…</span>';
+      diagramContent.textContent = '';
+      const ph = document.createElement('span');
+      ph.className = 'placeholder';
+      ph.textContent = 'Start typing to see your diagram…';
+      diagramContent.appendChild(ph);
       return;
     }
     const id = ++renderId;
     try {
       const uniqueId = `mmd-${Date.now()}`;
+      buildSourceMap(code);
       const { svg } = await mermaid.render(uniqueId, code);
       if (id === renderId) {
-        diagramContent.innerHTML = `<div class="diagram-stage">${svg}</div>`;
+        const stage = document.createElement('div');
+        stage.className = 'diagram-stage';
+        stage.appendChild(document.createRange().createContextualFragment(svg));
+        diagramContent.textContent = '';
+        diagramContent.appendChild(stage);
+        tagSvgElements();
         fitDiagram();
       }
     } catch (e) {
       if (id === renderId) {
-        diagramContent.innerHTML = `<div class="error-box"><span class="error-label">⚠ SYNTAX ERROR</span><pre class="error-pre">${escapeHtml(e.message || 'Syntax error')}</pre></div>`;
+        diagramContent.textContent = '';
+        const box = document.createElement('div');
+        box.className = 'error-box';
+        const label = document.createElement('span');
+        label.className = 'error-label';
+        label.textContent = '⚠ SYNTAX ERROR';
+        const pre = document.createElement('pre');
+        pre.className = 'error-pre';
+        pre.textContent = e.message || 'Syntax error';
+        box.appendChild(label);
+        box.appendChild(pre);
+        diagramContent.appendChild(box);
       }
       document.querySelectorAll('[id^="dmmd-"]').forEach(el => el.remove());
     }
@@ -363,7 +647,7 @@
 
   let panState = null;
   diagramContent.addEventListener('mousedown', e => {
-    if (e.button !== 0 || !getStage()) return;
+    if (e.button !== 0 || !getStage() || pendingEdge) return;
     panState = { startX: e.clientX, startY: e.clientY, origX: view.x, origY: view.y };
     diagramContent.classList.add('panning');
   });
@@ -549,6 +833,405 @@
   document.getElementById('help-btn').addEventListener('click', openHelp);
   helpModal.addEventListener('click', e => { if (e.target.dataset.close !== undefined) closeHelp(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && !helpModal.hidden) closeHelp(); });
+
+  // ─── Hover Highlight ───
+  const hlBand = document.getElementById('editor-highlight');
+
+  function hlEditorLine(lineIdx, fromSvg) {
+    if (lineIdx == null || !renderState) { clearEditorHl(); return; }
+    const lh = 21;
+    const top = lineIdx * lh + 14 - editor.scrollTop;
+    hlBand.style.top = top + 'px';
+    hlBand.style.display = 'block';
+    hlBand.classList.toggle('svg-hl', !!fromSvg);
+    lineNumbers.querySelectorAll('.line-num.hl').forEach(el => el.classList.remove('hl', 'svg-hl'));
+    const row = lineNumbers.querySelector(`.line-num[data-line="${lineIdx}"]`);
+    if (row) { row.classList.add('hl'); if (fromSvg) row.classList.add('svg-hl'); }
+  }
+
+  function clearEditorHl() {
+    hlBand.style.display = 'none';
+    hlBand.classList.remove('svg-hl');
+    lineNumbers.querySelectorAll('.line-num.hl').forEach(el => el.classList.remove('hl', 'svg-hl'));
+  }
+
+  function hlSvgId(sourceId) {
+    clearSvgHl();
+    if (!sourceId) return;
+    const svg = getSvg();
+    if (!svg) return;
+    svg.querySelectorAll(`[data-ms-id="${sourceId}"]`).forEach(el => el.classList.add('ms-hl'));
+  }
+
+  function clearSvgHl() {
+    const svg = getSvg();
+    if (svg) svg.querySelectorAll('.ms-hl').forEach(el => el.classList.remove('ms-hl'));
+  }
+
+  // SVG → editor: hover a node/edge/cluster, highlight its source line
+  diagramContent.addEventListener('mouseover', e => {
+    if (!renderState) return;
+    const el = e.target.closest('[data-ms-id]');
+    if (!el) { clearEditorHl(); return; }
+    const entry = renderState.byElementId.get(el.dataset.msId);
+    if (!entry) { clearEditorHl(); return; }
+    hlEditorLine(entry.line, true);
+    hlSvgId(el.dataset.msId);
+  });
+
+  diagramContent.addEventListener('mouseleave', () => { clearEditorHl(); clearSvgHl(); });
+
+  // Editor gutter → SVG: hover a line number, highlight matching SVG elements
+  editor.addEventListener('scroll', () => {
+    // Keep band in sync with editor scroll
+    const activeHl = lineNumbers.querySelector('.line-num.hl');
+    if (activeHl) {
+      const lineIdx = parseInt(activeHl.dataset.line, 10);
+      hlEditorLine(lineIdx);
+    }
+  });
+
+  lineNumbers.addEventListener('mouseover', e => {
+    if (!renderState) return;
+    const row = e.target.closest('.line-num');
+    if (!row) return;
+    const lineIdx = parseInt(row.dataset.line, 10);
+    const ids = renderState.byLine.get(lineIdx) || [];
+    clearSvgHl();
+    lineNumbers.querySelectorAll('.line-num.hl').forEach(el => el.classList.remove('hl'));
+    row.classList.add('hl');
+    hlBand.style.top = (lineIdx * 21 + 14 - editor.scrollTop) + 'px';
+    hlBand.style.display = 'block';
+    const svg = getSvg();
+    if (svg) ids.forEach(id => svg.querySelectorAll(`[data-ms-id="${id}"]`).forEach(el => el.classList.add('ms-hl')));
+  });
+
+  lineNumbers.addEventListener('mouseleave', () => { clearEditorHl(); clearSvgHl(); });
+
+  // ─── Source Rewrite ───
+
+  function needsQuoting(label) {
+    return /[^\w\s-]/.test(label) || /^\d/.test(label);
+  }
+
+  function quoteLabel(label) {
+    return needsQuoting(label) ? '"' + label.replace(/"/g, '&quot;') + '"' : label;
+  }
+
+  function rewriteNodeLabel(lineIdx, nodeId, newLabel) {
+    const lines = editor.value.split('\n');
+    const quoted = quoteLabel(newLabel);
+    // Match the node with any bracket pair and replace only the label text inside
+    lines[lineIdx] = lines[lineIdx].replace(
+      new RegExp('(\\b' + escapeRegex(nodeId) + ')(\\[\\[|\\(\\[|\\(\\(|\\{\\{|\\[|\\(|\\{|>)([^\\[\\]\\(\\)\\{\\}]*?)(\\]\\]|\\]\\)|\\)\\)|\\}\\}|\\]|\\)|\\}|>)'),
+      (_, id, open, _lbl, close) => id + open + quoted + close
+    );
+    setCode(lines.join('\n'));
+  }
+
+  function rewriteNodeShape(lineIdx, nodeId, newOpen, newClose) {
+    const lines = editor.value.split('\n');
+    lines[lineIdx] = lines[lineIdx].replace(
+      new RegExp('(\\b' + escapeRegex(nodeId) + ')(\\[\\[|\\(\\[|\\(\\(|\\{\\{|\\[|\\(|\\{|>)([^\\[\\]\\(\\)\\{\\}]*?)(\\]\\]|\\]\\)|\\)\\)|\\}\\}|\\]|\\)|\\}|>)'),
+      (_, id, _open, label) => id + newOpen + label + newClose
+    );
+    setCode(lines.join('\n'));
+  }
+
+  function rewriteEdgeStyle(lineIdx, fromId, toId, newOp) {
+    const lines = editor.value.split('\n');
+    const line = lines[lineIdx];
+    // Replace the edge operator between fromId and toId
+    const updated = line.replace(
+      new RegExp('(\\b' + escapeRegex(fromId) + '\\b[^-=.]*?)' + EDGE_RE.source + '([^-=.]*?\\b' + escapeRegex(toId) + '\\b)'),
+      (_, before, _op, after) => before + newOp + after
+    );
+    lines[lineIdx] = updated;
+    setCode(lines.join('\n'));
+  }
+
+  function deleteNode(nodeId) {
+    if (!renderState) return;
+    const lines = editor.value.split('\n');
+    const keep = lines.filter((line, i) => {
+      const t = line.trim();
+      // Remove the node's definition line
+      if (i === (renderState.byElementId.get(nodeId) || {}).line) {
+        const nm = t.match(NODE_OPEN);
+        if (nm && nm[1] === nodeId && !EDGE_RE.test(t)) return false;
+      }
+      // Remove lines containing edges incident to this node
+      if (EDGE_RE.test(t)) {
+        const stripped = t.replace(/"[^"]*"/g, '""');
+        const edgeIds = [...renderState.byElementId.entries()]
+          .filter(([k, v]) => v.kind === 'edge' && v.line === i)
+          .map(([k]) => k);
+        if (edgeIds.some(k => k.startsWith(nodeId + '-') || k.endsWith('-' + nodeId))) return false;
+      }
+      // Remove style/class lines for this node
+      if (t.startsWith('style ' + nodeId + ' ') || t.match(new RegExp('\\bclass\\b.*\\b' + escapeRegex(nodeId) + '\\b'))) return false;
+      return true;
+    });
+    setCode(keep.join('\n'));
+  }
+
+  function deleteEdge(edgeKey, lineIdx) {
+    const lines = editor.value.split('\n');
+    const line = lines[lineIdx];
+    const [fromId, toId] = edgeKey.split('-');
+    // If the line has only this edge, remove the whole line
+    const withoutEdge = line.replace(
+      new RegExp('\\s*\\b' + escapeRegex(fromId) + '\\b[^-=.]*?' + EDGE_RE.source + '[^-=.]*?\\b' + escapeRegex(toId) + '\\b\\s*'),
+      ' '
+    ).trim();
+    if (!withoutEdge) lines.splice(lineIdx, 1);
+    else lines[lineIdx] = withoutEdge;
+    setCode(lines.join('\n'));
+  }
+
+  function wrapInSubgraph(nodeId, lineIdx) {
+    const lines = editor.value.split('\n');
+    let n = 1;
+    while (editor.value.includes('subgraph SG_' + n)) n++;
+    lines.splice(lineIdx, 0, '    subgraph SG_' + n + '[Group]');
+    lines.splice(lineIdx + 2, 0, '    end');
+    setCode(lines.join('\n'));
+  }
+
+  function escapeRegex(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+
+  // ─── Context Menu ───
+  const ctxMenu = document.getElementById('ctx-menu');
+  let ctxSubmenu = null;
+
+  function hideMenu() {
+    ctxMenu.hidden = true;
+    if (ctxSubmenu) { ctxSubmenu.remove(); ctxSubmenu = null; }
+  }
+
+  function showMenu(x, y, items) {
+    hideMenu();
+    ctxMenu.textContent = '';
+    items.forEach(item => {
+      if (item === 'sep') {
+        const sep = document.createElement('div');
+        sep.className = 'ctx-sep';
+        ctxMenu.appendChild(sep);
+        return;
+      }
+      const el = document.createElement('div');
+      el.className = 'ctx-item' + (item.danger ? ' danger' : '');
+      const label = document.createElement('span');
+      label.textContent = item.label;
+      el.appendChild(label);
+      if (item.submenu) {
+        const arrow = document.createElement('span');
+        arrow.className = 'ctx-arrow';
+        arrow.textContent = '▶';
+        el.appendChild(arrow);
+        el.addEventListener('mouseenter', ev => {
+          if (ctxSubmenu) { ctxSubmenu.remove(); ctxSubmenu = null; }
+          const sub = document.createElement('div');
+          sub.className = 'ctx-submenu';
+          item.submenu.forEach(si => {
+            const sel = document.createElement('div');
+            sel.className = 'ctx-item';
+            sel.textContent = si.label;
+            sel.addEventListener('click', () => { hideMenu(); si.action(); });
+            sub.appendChild(sel);
+          });
+          const r = el.getBoundingClientRect();
+          const subX = Math.min(r.right + 2, window.innerWidth - 170);
+          const subY = Math.min(r.top, window.innerHeight - sub.children.length * 34 - 12);
+          sub.style.left = subX + 'px';
+          sub.style.top = subY + 'px';
+          document.body.appendChild(sub);
+          ctxSubmenu = sub;
+        });
+      } else if (item.action) {
+        el.addEventListener('click', () => { hideMenu(); item.action(); });
+      }
+      ctxMenu.appendChild(el);
+    });
+    const clampX = Math.min(x, window.innerWidth - 200);
+    const clampY = Math.min(y, window.innerHeight - items.length * 34 - 12);
+    ctxMenu.style.left = clampX + 'px';
+    ctxMenu.style.top = clampY + 'px';
+    ctxMenu.hidden = false;
+  }
+
+  const SHAPES = [
+    { label: 'Rectangle  [ ]', open: '[', close: ']' },
+    { label: 'Round  ( )',     open: '(', close: ')' },
+    { label: 'Stadium  ([ ])', open: '([', close: '])' },
+    { label: 'Subroutine  [[ ]]', open: '[[', close: ']]' },
+    { label: 'Cylinder  [( )]', open: '[(', close: ')]' },
+    { label: 'Circle  (( ))',  open: '((', close: '))' },
+    { label: 'Diamond  { }',   open: '{', close: '}' },
+    { label: 'Hexagon  {{ }}', open: '{{', close: '}}' },
+    { label: 'Asymmetric  >]', open: '>', close: ']' },
+  ];
+
+  const ARROW_STYLES = [
+    { label: '--> Arrow', op: '-->' },
+    { label: '--- Line', op: '---' },
+    { label: '==> Thick arrow', op: '==>' },
+    { label: '-.- Dotted', op: '-.->' },
+    { label: '<--> Both ways', op: '<-->' },
+  ];
+
+  function menuItemsFor(entry, sourceId) {
+    const revealAction = () => {
+      const lines = editor.value.split('\n');
+      const pos = lines.slice(0, entry.line).join('\n').length + (entry.line > 0 ? 1 : 0);
+      editor.focus();
+      editor.setSelectionRange(pos, pos + lines[entry.line].length);
+      const lh = 21;
+      editor.scrollTop = Math.max(0, entry.line * lh - editor.clientHeight / 2);
+      hlEditorLine(entry.line);
+    };
+
+    const aiAction = () => {
+      const tmpl = 'Transform this ' + entry.kind + ' ("' + sourceId + '") on line ' + (entry.line + 1) + ': ';
+      chatInput.value = tmpl;
+      chatInput.focus();
+      chatInput.setSelectionRange(tmpl.length, tmpl.length);
+    };
+
+    if (entry.kind === 'node') {
+      return [
+        { label: 'Reveal in editor', action: revealAction },
+        'sep',
+        { label: 'Rename label…', action: () => {
+          const cur = (entry.raw.match(/[\[\(\{>]([^\]\)\}]*)/) || [])[1] || sourceId;
+          const label = window.prompt('New label:', cur.replace(/^"|"$/g, ''));
+          if (label != null) rewriteNodeLabel(entry.line, sourceId, label);
+        }},
+        { label: 'Change shape ▶', submenu: SHAPES.map(s => ({
+          label: s.label,
+          action: () => rewriteNodeShape(entry.line, sourceId, s.open, s.close),
+        }))},
+        { label: 'Add edge from here', action: () => startAddEdge(sourceId) },
+        { label: 'Wrap in subgraph', action: () => wrapInSubgraph(sourceId, entry.line) },
+        { label: 'Add styling…', action: () => {
+          const frag = window.prompt('CSS-like style fragment (e.g. fill:#f9f,stroke:#333):', '');
+          if (frag) {
+            const lines = editor.value.split('\n');
+            lines.push('style ' + sourceId + ' ' + frag);
+            setCode(lines.join('\n'));
+          }
+        }},
+        'sep',
+        { label: 'AI: transform this…', action: aiAction },
+        'sep',
+        { label: 'Delete node', danger: true, action: () => {
+          if (window.confirm('Delete node "' + sourceId + '" and its edges?')) deleteNode(sourceId);
+        }},
+      ];
+    }
+
+    if (entry.kind === 'edge') {
+      return [
+        { label: 'Reveal in editor', action: revealAction },
+        'sep',
+        { label: 'Change arrow style ▶', submenu: ARROW_STYLES.map(s => ({
+          label: s.label,
+          action: () => rewriteEdgeStyle(entry.line, entry.from, entry.to, s.op),
+        }))},
+        'sep',
+        { label: 'AI: transform this…', action: aiAction },
+        'sep',
+        { label: 'Delete edge', danger: true, action: () => deleteEdge(sourceId, entry.line) },
+      ];
+    }
+
+    if (entry.kind === 'cluster') {
+      return [
+        { label: 'Reveal in editor', action: revealAction },
+        'sep',
+        { label: 'Rename…', action: () => {
+          const cur = (entry.raw.match(/subgraph\s+\w+\s*\[?([^\]]*)\]?/) || [])[1] || sourceId;
+          const label = window.prompt('New subgraph label:', cur.replace(/^"|"$/g, '').trim());
+          if (label != null) {
+            const lines = editor.value.split('\n');
+            lines[entry.line] = lines[entry.line].replace(/\[([^\]]*)\]/, '[' + label + ']');
+            setCode(lines.join('\n'));
+          }
+        }},
+        { label: 'Add styling…', action: () => {
+          const frag = window.prompt('CSS style (e.g. fill:#f9f):', '');
+          if (frag) {
+            const lines = editor.value.split('\n');
+            lines.push('style ' + sourceId + ' ' + frag);
+            setCode(lines.join('\n'));
+          }
+        }},
+        'sep',
+        { label: 'AI: transform this…', action: aiAction },
+      ];
+    }
+
+    return [{ label: 'Reveal in editor', action: revealAction }];
+  }
+
+  diagramContent.addEventListener('contextmenu', e => {
+    if (!renderState) return;
+    if (pendingEdge) return;
+    const el = e.target.closest('[data-ms-id]');
+    if (!el) return;
+    e.preventDefault();
+    const sourceId = el.dataset.msId;
+    const entry = renderState.byElementId.get(sourceId);
+    if (!entry) return;
+    showMenu(e.clientX, e.clientY, menuItemsFor(entry, sourceId));
+  });
+
+  document.addEventListener('mousedown', e => {
+    if (ctxMenu && !ctxMenu.hidden && !ctxMenu.contains(e.target) && (!ctxSubmenu || !ctxSubmenu.contains(e.target))) {
+      hideMenu();
+    }
+  });
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      if (!ctxMenu.hidden) { hideMenu(); return; }
+      if (pendingEdge) { cancelAddEdge(); }
+    }
+  });
+
+  // ─── Add Edge State Machine ───
+  let edgeBanner = null;
+
+  function startAddEdge(fromId) {
+    pendingEdge = { fromId };
+    if (!edgeBanner) {
+      edgeBanner = document.createElement('div');
+      edgeBanner.className = 'ctx-add-edge-banner';
+      document.body.appendChild(edgeBanner);
+    }
+    edgeBanner.textContent = 'Click target node to add edge from "' + fromId + '" — Esc to cancel';
+    edgeBanner.style.display = 'block';
+    diagramContent.style.cursor = 'crosshair';
+  }
+
+  function cancelAddEdge() {
+    pendingEdge = null;
+    if (edgeBanner) edgeBanner.style.display = 'none';
+    diagramContent.style.cursor = '';
+  }
+
+  diagramContent.addEventListener('click', e => {
+    if (!pendingEdge) return;
+    const el = e.target.closest('[data-ms-id]');
+    if (!el) { cancelAddEdge(); return; }
+    const toId = el.dataset.msId;
+    if (renderState && renderState.byElementId.get(toId) && renderState.byElementId.get(toId).kind === 'node') {
+      const lines = editor.value.split('\n');
+      lines.push('    ' + pendingEdge.fromId + ' --> ' + toId);
+      setCode(lines.join('\n'));
+    }
+    cancelAddEdge();
+  });
 
   // ─── Boot ───
   if (!activeChat.title) activeChat.title = deriveTitle(activeChat);

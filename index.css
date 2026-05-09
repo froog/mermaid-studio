@@ -234,3 +234,64 @@ textarea:focus, input:focus, button:focus-visible { outline: 1px solid var(--blu
 .markdown-body a { color: var(--blue); text-decoration: none; }
 .markdown-body a:hover { text-decoration: underline; }
 .markdown-body strong { color: var(--text0); font-weight: 600; }
+
+/* ─── Editor highlight band ─── */
+.editor-wrap { position: relative; }
+#editor-highlight {
+  position: absolute; left: 44px; right: 0; height: 21px;
+  background: rgba(88,166,255,0.10); pointer-events: none;
+  display: none; z-index: 0;
+}
+#editor-highlight.svg-hl {
+  background: rgba(188,140,255,0.22);
+  border-left: 2px solid var(--purple);
+  left: 42px;
+}
+.line-num.hl { background: rgba(88,166,255,0.15); color: var(--blue); }
+.line-num.hl.svg-hl { background: rgba(188,140,255,0.25); color: var(--purple); }
+
+/* ─── SVG hover highlight ─── */
+#diagram-content g.ms-hl {
+  filter: drop-shadow(0 0 7px rgba(88,166,255,0.7));
+}
+#diagram-content g.ms-hl rect,
+#diagram-content g.ms-hl polygon,
+#diagram-content g.ms-hl circle,
+#diagram-content g.ms-hl ellipse {
+  stroke: var(--blue) !important; stroke-width: 2px;
+}
+#diagram-content g.ms-hl path {
+  stroke: var(--blue) !important; stroke-width: 2.5px;
+}
+
+/* ─── Context menu ─── */
+.ctx-menu {
+  position: fixed; z-index: 200; min-width: 180px;
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 8px; box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  padding: 4px 0; font-family: var(--mono); font-size: 12px;
+  user-select: none;
+}
+.ctx-menu[hidden] { display: none; }
+.ctx-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 7px 14px; color: var(--text0); cursor: pointer; gap: 16px;
+  white-space: nowrap;
+}
+.ctx-item:hover { background: var(--bg3); color: var(--blue); }
+.ctx-item.danger:hover { background: rgba(248,81,73,0.12); color: var(--red); }
+.ctx-item .ctx-arrow { color: var(--text2); font-size: 10px; }
+.ctx-sep { height: 1px; background: var(--border); margin: 4px 0; }
+.ctx-submenu {
+  position: fixed; z-index: 201; min-width: 160px;
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 8px; box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  padding: 4px 0; font-family: var(--mono); font-size: 12px;
+}
+.ctx-submenu[hidden] { display: none; }
+.ctx-add-edge-banner {
+  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+  background: var(--bg2); border: 1px solid var(--blue); border-radius: 8px;
+  padding: 8px 18px; color: var(--blue); font-family: var(--mono); font-size: 12px;
+  z-index: 300; pointer-events: none; box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+}
