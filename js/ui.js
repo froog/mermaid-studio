@@ -317,8 +317,14 @@ function menuItemsFor(entry, sourceId) {
         } else if (renderState && renderState.diagramType === 'state') {
           if (!label) return;
           const lines = editor.value.split('\n');
-          const headerIdx = lines.findIndex(l => /^\s*stateDiagram/.test(l));
-          lines.splice(headerIdx >= 0 ? headerIdx + 1 : entry.line + 1, 0, '    state "' + label + '" as ' + sourceId);
+          const stateLineRe = new RegExp('^(\\s*state\\s+)"[^"]*"(\\s+as\\s+' + escapeRegex(sourceId) + '\\s*)$');
+          const existingIdx = lines.findIndex(l => stateLineRe.test(l));
+          if (existingIdx >= 0) {
+            lines[existingIdx] = lines[existingIdx].replace(stateLineRe, (_, pre, post) => pre + '"' + label + '"' + post);
+          } else {
+            const headerIdx = lines.findIndex(l => /^\s*stateDiagram/.test(l));
+            lines.splice(headerIdx >= 0 ? headerIdx + 1 : entry.line + 1, 0, '    state "' + label + '" as ' + sourceId);
+          }
           setCode(lines.join('\n'));
         } else {
           const lines = editor.value.split('\n');

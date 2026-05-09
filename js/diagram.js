@@ -33,7 +33,7 @@ function stripComments(lines) {
   let inInit = false;
   for (let i = 0; i < lines.length; i++) {
     const t = lines[i].trim();
-    if (!inInit && t.startsWith('%%{')) { inInit = true; out.push(null); continue; }
+    if (!inInit && t.startsWith('%%{')) { if (!t.endsWith('}%%')) inInit = true; out.push(null); continue; }
     if (inInit) { out.push(null); if (t.endsWith('}%%')) inInit = false; continue; }
     if (t.startsWith('%%')) { out.push(null); continue; }
     out.push(lines[i]);
