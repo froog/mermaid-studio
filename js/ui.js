@@ -309,16 +309,6 @@ const ARROW_STYLES = [
 ];
 
 function menuItemsFor(entry, sourceId) {
-  const revealAction = () => {
-    const lines = editor.value.split('\n');
-    const pos = lines.slice(0, entry.line).join('\n').length + (entry.line > 0 ? 1 : 0);
-    editor.focus();
-    editor.setSelectionRange(pos, pos + lines[entry.line].length);
-    const lh = 21;
-    editor.scrollTop = Math.max(0, entry.line * lh - editor.clientHeight / 2);
-    hlEditorLine(entry.line);
-  };
-
   const aiAction = () => {
     const tmpl = 'Transform this ' + entry.kind + ' ("' + sourceId + '") on line ' + (entry.line + 1) + ': ';
     chatInput.value = tmpl;
@@ -328,8 +318,6 @@ function menuItemsFor(entry, sourceId) {
 
   if (entry.kind === 'node') {
     return [
-      { label: 'Reveal in editor', action: revealAction },
-      'sep',
       { label: 'Rename node…', action: () => {
         const newId = window.prompt('New node ID:', sourceId);
         if (!newId || newId === sourceId) return;
@@ -399,8 +387,6 @@ function menuItemsFor(entry, sourceId) {
       rewriteEdgeLabel(entry.line, entry.from, entry.to, next);
     };
     return [
-      { label: 'Reveal in editor', action: revealAction },
-      'sep',
       { label: 'Rename edge…', action: renameAction },
       { label: 'Change arrow style', submenu: ARROW_STYLES.map(s => ({
         label: s.label,
@@ -415,8 +401,6 @@ function menuItemsFor(entry, sourceId) {
 
   if (entry.kind === 'cluster') {
     return [
-      { label: 'Reveal in editor', action: revealAction },
-      'sep',
       { label: 'Rename…', action: () => {
         const cur = (entry.raw.match(/subgraph\s+\w+\s*\[?([^\]]*)\]?/) || [])[1] || sourceId;
         const label = window.prompt('New subgraph label:', cur.replace(/^"|"$/g, '').trim());
@@ -439,7 +423,7 @@ function menuItemsFor(entry, sourceId) {
     ];
   }
 
-  return [{ label: 'Reveal in editor', action: revealAction }];
+  return [];
 }
 
 diagramContent.addEventListener('contextmenu', e => {
@@ -451,7 +435,9 @@ diagramContent.addEventListener('contextmenu', e => {
   const sourceId = el.dataset.msId;
   const entry = renderState.byElementId.get(sourceId);
   if (!entry) return;
-  showMenu(e.clientX, e.clientY, menuItemsFor(entry, sourceId));
+  const items = menuItemsFor(entry, sourceId);
+  if (!items.length) return;
+  showMenu(e.clientX, e.clientY, items);
 });
 
 document.addEventListener('mousedown', e => {
