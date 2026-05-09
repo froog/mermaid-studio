@@ -401,7 +401,16 @@ function menuItemsFor(entry, sourceId) {
 
   if (entry.kind === 'cluster') {
     return [
-      { label: 'Rename…', action: () => {
+      { label: 'Rename subgraph…', action: () => {
+        const newId = window.prompt('New subgraph ID:', sourceId);
+        if (!newId || newId === sourceId) return;
+        if (!/^[A-Za-z_][\w-]*$/.test(newId)) {
+          window.alert('Subgraph IDs must start with a letter or underscore and contain only letters, digits, underscores, or hyphens.');
+          return;
+        }
+        setCode(editor.value.replace(new RegExp('\\b' + escapeRegex(sourceId) + '\\b', 'g'), newId));
+      }},
+      { label: 'Edit label…', action: () => {
         const cur = (entry.raw.match(/subgraph\s+\w+\s*\[?([^\]]*)\]?/) || [])[1] || sourceId;
         const label = window.prompt('New subgraph label:', cur.replace(/^"|"$/g, '').trim());
         if (label != null) {
