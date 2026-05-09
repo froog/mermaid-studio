@@ -142,6 +142,38 @@ export function rewriteNodeShape(lineIdx, nodeId, newOpen, newClose) {
   setCode(lines.join('\n'));
 }
 
+export function rewriteEdgeLabel(lineIdx, fromId, toId, newLabel) {
+  const lines = editor.value.split('\n');
+  const line = lines[lineIdx];
+  const trimmed = (newLabel || '').trim();
+  const inner = trimmed
+    ? (needsQuoting(trimmed) ? '"' + trimmed.replace(/"/g, '&quot;') + '"' : trimmed)
+    : '';
+
+  // Groups:
+  //   1 = before-arrow segment ending at fromId
+  //   2 = arrow operator (from EDGE_RE's own capture)
+  //   3 = optional existing "|label|"
+  //   4 = after-arrow segment ending at toId
+  const segmentRe = new RegExp(
+    '(\\b' + escapeRegex(fromId) + '\\b[^-=.<>]*?)' + EDGE_RE.source + '(\\s*\\|[^|]*\\|)?([^-=.<>|]*?\\b' + escapeRegex(toId) + '\\b)'
+  );
+  const m = line.match(segmentRe);
+  if (!m) return;
+
+  const [, before, op, existing, after] = m;
+  let replacement;
+  if (existing) {
+    replacement = before + op + (trimmed ? '|' + inner + '|' : '') + after;
+  } else if (trimmed) {
+    replacement = before + op + '|' + inner + '|' + after;
+  } else {
+    return;
+  }
+  lines[lineIdx] = line.replace(segmentRe, replacement);
+  setCode(lines.join('\n'));
+}
+
 export function rewriteEdgeStyle(lineIdx, fromId, toId, newOp) {
   const lines = editor.value.split('\n');
   const line = lines[lineIdx];
@@ -359,10 +391,18 @@ function menuItemsFor(entry, sourceId) {
   }
 
   if (entry.kind === 'edge') {
+    const renameAction = () => {
+      const labelM = (entry.raw || '').match(/\|([^|]*)\|/);
+      const cur = labelM ? labelM[1].replace(/^"|"$/g, '').replace(/&quot;/g, '"') : '';
+      const next = window.prompt(labelM ? 'Edit edge label (blank to remove):' : 'Add edge label:', cur);
+      if (next == null) return;
+      rewriteEdgeLabel(entry.line, entry.from, entry.to, next);
+    };
     return [
       { label: 'Reveal in editor', action: revealAction },
       'sep',
-      { label: 'Change arrow style ▶', submenu: ARROW_STYLES.map(s => ({
+      { label: 'Rename edge…', action: renameAction },
+      { label: 'Change arrow style', submenu: ARROW_STYLES.map(s => ({
         label: s.label,
         action: () => rewriteEdgeStyle(entry.line, entry.from, entry.to, s.op),
       }))},
