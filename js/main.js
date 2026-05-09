@@ -5,6 +5,8 @@ import { scheduleRender } from './diagram.js';
 import { setCode, updateLineNumbers, refreshSelect } from './editor.js';
 import { renderChat } from './chat.js';
 import './ui.js';
+import { checkSession } from './auth.js';
+import './settings.js';
 
 mermaid.initialize({
   startOnLoad: false,
@@ -112,3 +114,4 @@ if (!activeChat.title) activeChat.title = deriveTitle(activeChat);
 setCode(activeChat.code);
 refreshSelect();
 renderChat();
+checkSession();

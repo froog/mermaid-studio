@@ -1,29 +1,50 @@
 # Mermaid Studio
 
-A minimal browser-based studio for authoring and previewing [Mermaid](https://mermaid.js.org/) diagrams, with AI-assisted generation via [OpenRouter](https://openrouter.ai/).
+A minimal browser-based studio for authoring and previewing [Mermaid](https://mermaid.js.org/) diagrams, with AI-assisted generation through any of nine LLM providers (or a custom OpenAI-compatible endpoint).
 
-The app is a static `index.html` + `index.js` + `index.css` served by a tiny Node.js proxy that forwards requests to OpenRouter's chat completions API (so your API key stays out of the browser).
+The editor and preview work fully without an account. AI features require signing up locally so your API keys can be stored encrypted on disk and never live in the browser.
 
 ## Requirements
 
 - Node.js (no npm dependencies — uses only built-ins)
-- An OpenRouter API key
+- An API key for at least one supported provider
 
 ## Run
 
 ```sh
-OPENROUTER_API_KEY=sk-or-... node server.js
+node server.js
 ```
 
-Then open <http://localhost:3000>.
+Then open <http://localhost:3000>. On first run it generates `.env` with an `ENCRYPTION_SECRET` used to encrypt stored API keys.
+
+## First-time setup
+
+1. Click **Sign in** in the chat pane and create an account (local — username + password).
+2. Open **Settings** (⚙ in the top bar), pick a provider and model.
+3. Paste the API key for that provider. It's encrypted with AES-256-GCM and stored under your username in `keys.json`.
+4. Send a message in chat.
+
+You can switch providers or models at any time. Keys are stored per provider, per user.
+
+## Providers
+
+Anthropic · OpenAI · Google · Mistral · DeepSeek · xAI · Cohere · Meta (via Groq) · OpenRouter · Custom (any OpenAI-compatible host: Ollama, vLLM, LM Studio, etc.)
+
+The model picker is data-driven — see `providers/index.js` to add or update model IDs.
 
 ## Files
 
-- `server.js` — minimal HTTP server. Serves `index.html` / `index.js` / `index.css` and proxies `POST /api/messages` to `https://openrouter.ai/api/v1/chat/completions`.
-- `index.html` — markup.
-- `index.css` — styles.
-- `index.js` — client logic (editor, preview, chat, persistence).
+- `server.js` — HTTP server: static files, auth, encrypted key storage, provider proxy.
+- `providers/` — adapters per provider (`anthropic.js`, `openai.js`, `google.js`, `cohere.js`) and the registry.
+- `index.html` / `index.css` — markup and styles.
+- `js/` — client modules (editor, preview, chat, auth, settings, persistence).
+- `users.json` — auto-created, gitignored. Username + scrypt-hashed password.
+- `keys.json` — auto-created, gitignored. AES-256-GCM-encrypted API keys per user.
+- `.env` — auto-created, gitignored. Holds `ENCRYPTION_SECRET`.
 
-## Changing the model
+## Constraints
 
-The model is set via the `MODEL` constant at the top of `index.js` (default `anthropic/claude-sonnet-4.5`). Swap it for any [OpenRouter model slug](https://openrouter.ai/models) (e.g. `openai/gpt-4o`, `google/gemini-2.5-pro`).
+- Zero npm dependencies — Node built-ins only.
+- All vendor API calls and credential storage happen server-side; the browser never sees your raw API keys.
+- Sessions are kept in memory and reset on server restart (you'll need to sign in again).
+- No email, no password recovery — this is a local/small-team tool.

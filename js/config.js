@@ -1,4 +1,3 @@
-export const MODEL = 'anthropic/claude-sonnet-4.5';
 export const STORAGE_KEY = 'mermaid-studio:v1';
 export const GREETING = "I can help you create Mermaid diagrams. Describe what you need — a flowchart, sequence diagram, ER diagram, etc. — and I'll generate the code.";
 

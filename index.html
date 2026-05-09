@@ -27,6 +27,7 @@
     <div class="file-bar">
       <button class="example-btn" id="load-btn" title="Upload a .mmd file into a new chat">↑ Upload</button>
       <button class="example-btn" id="download-btn" title="Download editor contents">↓ Download</button>
+      <button class="example-btn settings-btn" id="settings-btn" title="Settings" aria-label="Settings">⚙</button>
       <input type="file" id="load-input" accept=".mmd,.txt,text/plain" style="display:none">
     </div>
   </header>
@@ -67,6 +68,9 @@
         <select id="chat-select" class="chat-select" aria-label="Select chat"></select>
         <button id="chat-new" class="chat-icon-btn" title="New chat">+</button>
         <button id="chat-del" class="chat-icon-btn chat-del-btn" title="Delete chat">×</button>
+        <span id="auth-status" class="auth-status">
+          <button id="auth-signin" class="auth-link" type="button">Sign in</button>
+        </span>
       </div>
       <div class="chat-scroll" id="chat-scroll"></div>
       <div class="chat-input-row">
@@ -85,6 +89,101 @@
       <button class="modal-close" data-close aria-label="Close">×</button>
     </div>
     <div id="help-content" class="modal-content markdown-body">Loading…</div>
+  </div>
+</div>
+
+<aside id="settings-panel" class="settings-panel" hidden aria-label="Settings">
+  <div class="settings-header">
+    <span class="settings-title">SETTINGS</span>
+    <button id="settings-close" class="settings-close" aria-label="Close">×</button>
+  </div>
+  <div class="settings-body">
+
+    <section class="settings-section">
+      <h3 class="settings-h3">Provider &amp; Model</h3>
+      <label class="settings-field">
+        <span>Provider</span>
+        <select id="settings-provider"></select>
+      </label>
+      <label class="settings-field" id="settings-model-row">
+        <span>Model</span>
+        <select id="settings-model"></select>
+      </label>
+      <label class="settings-field is-hidden" id="settings-model-text-row">
+        <span>Model ID</span>
+        <input id="settings-model-text" type="text" list="settings-model-suggest" placeholder="provider/model-name">
+        <datalist id="settings-model-suggest"></datalist>
+      </label>
+      <div id="settings-key-row" class="settings-field is-hidden">
+        <span>API key for <span id="settings-key-provider-label"></span></span>
+        <div class="settings-key-row">
+          <input id="settings-key-input" type="password" placeholder="Paste key, leave blank to keep existing">
+          <button id="settings-key-save" type="button" class="settings-btn-mini">Save</button>
+          <button id="settings-key-delete" type="button" class="settings-btn-mini settings-btn-danger is-hidden">Remove</button>
+        </div>
+        <div id="settings-key-status" class="settings-key-status"></div>
+      </div>
+      <div id="settings-key-locked" class="settings-locked-msg is-hidden">
+        Sign in to store API keys for this provider.
+      </div>
+    </section>
+
+    <section class="settings-section is-hidden" id="settings-custom-section">
+      <h3 class="settings-h3">Custom Endpoint</h3>
+      <p class="settings-help">Use Ollama, vLLM, LM Studio, or any OpenAI-compatible host.</p>
+      <label class="settings-field">
+        <span>Base URL</span>
+        <input id="settings-custom-url" type="text" placeholder="http://localhost:11434/v1/chat/completions">
+      </label>
+      <label class="settings-field">
+        <span>Model</span>
+        <input id="settings-custom-model" type="text" placeholder="my-model">
+      </label>
+      <label class="settings-field">
+        <span>API key (optional)</span>
+        <input id="settings-custom-key" type="password" placeholder="leave blank for local models">
+      </label>
+      <label class="settings-checkbox">
+        <input id="settings-custom-compat" type="checkbox" checked>
+        <span>OpenAI-compatible request format</span>
+      </label>
+      <label class="settings-field is-hidden" id="settings-custom-headers-row">
+        <span>Custom headers (JSON)</span>
+        <textarea id="settings-custom-headers" rows="4" placeholder='{"X-My-Header": "value"}'></textarea>
+      </label>
+      <button id="settings-custom-use" type="button" class="settings-btn-mini">Use this endpoint</button>
+    </section>
+
+    <section class="settings-section">
+      <h3 class="settings-h3">Agent System Prompt</h3>
+      <p class="settings-help">Customize the assistant's behavior. Reset clears local override.</p>
+      <textarea id="settings-system-prompt" rows="10"></textarea>
+      <div class="settings-row">
+        <button id="settings-prompt-reset" type="button" class="settings-btn-mini">Reset to default</button>
+      </div>
+    </section>
+
+  </div>
+</aside>
+
+<div id="auth-modal" class="modal" hidden>
+  <div class="modal-backdrop" data-close></div>
+  <div class="modal-panel auth-panel" role="dialog" aria-modal="true" aria-labelledby="auth-title">
+    <div class="modal-header">
+      <span id="auth-title" class="modal-title">Sign in</span>
+      <button class="modal-close" data-close aria-label="Close">×</button>
+    </div>
+    <form id="auth-form" class="auth-form" autocomplete="off">
+      <label class="auth-label">Username
+        <input id="auth-username" type="text" autocomplete="username" required minlength="3" maxlength="32" pattern="[a-zA-Z0-9_]+">
+      </label>
+      <label class="auth-label">Password
+        <input id="auth-password" type="password" autocomplete="current-password" required minlength="8">
+      </label>
+      <div id="auth-error" class="auth-error" hidden></div>
+      <button id="auth-submit" type="submit" class="auth-submit">Sign In</button>
+      <button id="auth-toggle" type="button" class="auth-toggle">Don't have an account? Create one</button>
+    </form>
   </div>
 </div>
 

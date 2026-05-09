@@ -2,90 +2,418 @@ const http = require('http');
 const https = require('https');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
+const providers = require('./providers');
 
-const PORT = 3000;
-const API_KEY = process.env.OPENROUTER_API_KEY;
+const PORT = Number(process.env.PORT) || 3000;
+const ROOT = __dirname;
+const USERS_FILE = path.join(ROOT, 'users.json');
+const KEYS_FILE = path.join(ROOT, 'keys.json');
+const ENV_FILE = path.join(ROOT, '.env');
 
-if (!API_KEY) {
-  console.error('\n  ✗ Missing OPENROUTER_API_KEY\n');
-  console.error('  Run with:');
-  console.error('    OPENROUTER_API_KEY=sk-or-... node server.js\n');
-  process.exit(1);
-}
+// ─── Env (.env) ─────────────────────────────────────────────────────────────
+loadEnvFile();
+ensureEncryptionSecret();
 
-const server = http.createServer((req, res) => {
-  // ─── Proxy API calls ───
-  if (req.method === 'POST' && req.url === '/api/messages') {
-    let body = '';
-    req.on('data', chunk => body += chunk);
-    req.on('end', () => {
-      const apiReq = https.request({
-        hostname: 'openrouter.ai',
-        path: '/api/v1/chat/completions',
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${API_KEY}`,
-          'HTTP-Referer': 'http://localhost:3000',
-          'X-Title': 'Mermaid Studio',
-        },
-      }, apiRes => {
-        res.writeHead(apiRes.statusCode, { 'Content-Type': 'application/json' });
-        apiRes.pipe(res);
-      });
+const ENCRYPTION_SECRET = Buffer.from(process.env.ENCRYPTION_SECRET, 'hex');
 
-      apiReq.on('error', err => {
-        res.writeHead(502, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: err.message }));
-      });
+// ─── In-memory session map: token → username ────────────────────────────────
+const sessions = new Map();
 
-      apiReq.write(body);
-      apiReq.end();
-    });
-    return;
+// ─── Boot ───────────────────────────────────────────────────────────────────
+const server = http.createServer(async (req, res) => {
+  try {
+    if (await routeApi(req, res)) return;
+    if (routeStatic(req, res)) return;
+    send(res, 404, 'Not found');
+  } catch (err) {
+    console.error('Unhandled error:', err);
+    sendJson(res, 500, { error: 'Internal server error' });
+  }
+});
+
+server.listen(PORT, () => {
+  console.log(`\n  ⚡ Mermaid Studio running at http://localhost:${PORT}\n`);
+});
+
+// ─── API routing ────────────────────────────────────────────────────────────
+async function routeApi(req, res) {
+  const url = req.url;
+
+  if (req.method === 'POST' && url === '/api/auth/signup') return handleSignup(req, res);
+  if (req.method === 'POST' && url === '/api/auth/login')  return handleLogin(req, res);
+  if (req.method === 'GET'  && url === '/api/auth/me')     return handleMe(req, res);
+  if (req.method === 'POST' && url === '/api/auth/logout') return handleLogout(req, res);
+
+  if (req.method === 'GET'    && url === '/api/providers') {
+    sendJson(res, 200, providers.publicCatalog());
+    return true;
   }
 
-  // ─── Serve static files ───
+  if (req.method === 'POST'   && url === '/api/keys') return handlePostKey(req, res);
+  if (req.method === 'GET'    && url === '/api/keys') return handleListKeys(req, res);
+  if (req.method === 'DELETE' && url.startsWith('/api/keys/')) return handleDeleteKey(req, res);
+
+  if (req.method === 'POST' && url === '/api/messages')    return handleMessages(req, res);
+
+  return false;
+}
+
+// ─── Auth handlers ──────────────────────────────────────────────────────────
+async function handleSignup(req, res) {
+  const body = await readJson(req);
+  const username = String(body.username || '').trim();
+  const password = String(body.password || '');
+
+  if (!/^[a-zA-Z0-9_]{3,32}$/.test(username)) {
+    sendJson(res, 400, { error: 'Username must be 3-32 chars, letters/digits/underscore only' });
+    return true;
+  }
+  if (password.length < 8) {
+    sendJson(res, 400, { error: 'Password must be at least 8 characters' });
+    return true;
+  }
+
+  const users = readJson_(USERS_FILE);
+  if (users[username]) {
+    sendJson(res, 409, { error: 'Username taken' });
+    return true;
+  }
+
+  const salt = crypto.randomBytes(16);
+  const hash = crypto.scryptSync(password, salt, 64);
+  users[username] = { hash: hash.toString('hex'), salt: salt.toString('hex') };
+  writeJson_(USERS_FILE, users);
+
+  startSession(res, username);
+  sendJson(res, 200, { username });
+  return true;
+}
+
+async function handleLogin(req, res) {
+  const body = await readJson(req);
+  const username = String(body.username || '').trim();
+  const password = String(body.password || '');
+
+  const users = readJson_(USERS_FILE);
+  const u = users[username];
+  if (!u) {
+    sendJson(res, 401, { error: 'Invalid username or password' });
+    return true;
+  }
+
+  const salt = Buffer.from(u.salt, 'hex');
+  const expected = Buffer.from(u.hash, 'hex');
+  const got = crypto.scryptSync(password, salt, 64);
+  if (!crypto.timingSafeEqual(got, expected)) {
+    sendJson(res, 401, { error: 'Invalid username or password' });
+    return true;
+  }
+
+  startSession(res, username);
+  sendJson(res, 200, { username });
+  return true;
+}
+
+function handleMe(req, res) {
+  const username = currentUser(req);
+  if (!username) {
+    sendJson(res, 401, { error: 'Not authenticated' });
+    return true;
+  }
+  sendJson(res, 200, { username });
+  return true;
+}
+
+function handleLogout(req, res) {
+  const token = parseSessionCookie(req);
+  if (token) sessions.delete(token);
+  res.setHeader('Set-Cookie', 'session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0');
+  sendJson(res, 200, { ok: true });
+  return true;
+}
+
+// ─── API key handlers ──────────────────────────────────────────────────────
+async function handlePostKey(req, res) {
+  const username = currentUser(req);
+  if (!username) { sendJson(res, 401, { error: 'Not authenticated' }); return true; }
+
+  const body = await readJson(req);
+  const provider = String(body.provider || '').trim();
+  const apiKey = String(body.apiKey || '');
+  if (!provider || !apiKey) {
+    sendJson(res, 400, { error: 'Missing provider or apiKey' });
+    return true;
+  }
+
+  const all = readJson_(KEYS_FILE);
+  if (!all[username]) all[username] = {};
+  all[username][provider] = encryptKey(apiKey);
+  writeJson_(KEYS_FILE, all);
+
+  sendJson(res, 200, { ok: true });
+  return true;
+}
+
+function handleListKeys(req, res) {
+  const username = currentUser(req);
+  if (!username) { sendJson(res, 401, { error: 'Not authenticated' }); return true; }
+
+  const all = readJson_(KEYS_FILE);
+  const providers = Object.keys(all[username] || {}).sort();
+  sendJson(res, 200, { providers });
+  return true;
+}
+
+function handleDeleteKey(req, res) {
+  const username = currentUser(req);
+  if (!username) { sendJson(res, 401, { error: 'Not authenticated' }); return true; }
+
+  const provider = decodeURIComponent(req.url.slice('/api/keys/'.length));
+  if (!provider) {
+    sendJson(res, 400, { error: 'Missing provider' });
+    return true;
+  }
+  const all = readJson_(KEYS_FILE);
+  if (all[username] && all[username][provider]) {
+    delete all[username][provider];
+    if (Object.keys(all[username]).length === 0) delete all[username];
+    writeJson_(KEYS_FILE, all);
+  }
+  sendJson(res, 200, { ok: true });
+  return true;
+}
+
+// ─── Encryption (AES-256-GCM) ───────────────────────────────────────────────
+function encryptKey(plaintext) {
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', ENCRYPTION_SECRET, iv);
+  const enc = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return { encrypted: enc.toString('hex'), iv: iv.toString('hex'), tag: tag.toString('hex') };
+}
+function decryptKey(record) {
+  const iv = Buffer.from(record.iv, 'hex');
+  const tag = Buffer.from(record.tag, 'hex');
+  const enc = Buffer.from(record.encrypted, 'hex');
+  const decipher = crypto.createDecipheriv('aes-256-gcm', ENCRYPTION_SECRET, iv);
+  decipher.setAuthTag(tag);
+  return Buffer.concat([decipher.update(enc), decipher.final()]).toString('utf8');
+}
+
+function getStoredKey(username, provider) {
+  const all = readJson_(KEYS_FILE);
+  const record = all[username] && all[username][provider];
+  if (!record) return null;
+  try { return decryptKey(record); }
+  catch (err) { console.error('Failed to decrypt key:', err); return null; }
+}
+
+// ─── Messages proxy ─────────────────────────────────────────────────────────
+async function handleMessages(req, res) {
+  const username = currentUser(req);
+  if (!username) {
+    sendJson(res, 401, { error: 'Sign in to use AI features.' });
+    return true;
+  }
+
+  const payload = await readJson(req);
+  const provider = String(payload.provider || '').trim();
+  const model = String(payload.model || '').trim();
+  const system = typeof payload.system === 'string' ? payload.system : '';
+  const messages = Array.isArray(payload.messages) ? payload.messages : [];
+  const max_tokens = Number(payload.max_tokens) || 1000;
+  if (!provider) { sendJson(res, 400, { error: 'Missing provider' }); return true; }
+  if (!model)    { sendJson(res, 400, { error: 'Missing model' });    return true; }
+
+  // Resolve adapter + API key
+  let adapter, apiKey;
+  if (provider === 'custom') {
+    const cfg = payload.custom || {};
+    if (!cfg.baseUrl) { sendJson(res, 400, { error: 'Custom endpoint missing Base URL' }); return true; }
+    adapter = providers.customAdapter({
+      baseUrl: cfg.baseUrl,
+      openaiCompatible: cfg.openaiCompatible !== false,
+      customHeaders: parseHeaders(cfg.headers),
+    });
+    apiKey = cfg.apiKey || '';
+  } else {
+    const p = providers.getProvider(provider);
+    if (!p) { sendJson(res, 400, { error: `Unknown provider: ${provider}` }); return true; }
+    apiKey = getStoredKey(username, provider);
+    if (!apiKey) {
+      sendJson(res, 400, { error: 'No API key stored for this provider. Add one in Settings.' });
+      return true;
+    }
+    adapter = p.adapter;
+  }
+
+  // Build vendor request and forward
+  let built;
+  try {
+    built = adapter.buildRequest({ model, system, messages, max_tokens }, apiKey);
+  } catch (err) {
+    sendJson(res, 400, { error: `Failed to build request: ${err.message}` });
+    return true;
+  }
+
+  forwardRequest(built, (err, statusCode, data) => {
+    if (err) {
+      sendJson(res, 502, { error: err.message });
+      return;
+    }
+    if (statusCode >= 400) {
+      const detail = (data && (data.error?.message || data.error?.error?.message || data.error || data.message)) || `Upstream error ${statusCode}`;
+      sendJson(res, statusCode, { error: typeof detail === 'string' ? detail : JSON.stringify(detail) });
+      return;
+    }
+    let content;
+    try { content = adapter.parseResponse(data); }
+    catch (parseErr) {
+      sendJson(res, 502, { error: `Failed to parse response: ${parseErr.message}` });
+      return;
+    }
+    sendJson(res, 200, { content });
+  });
+  return true;
+}
+
+function parseHeaders(raw) {
+  if (!raw) return {};
+  if (typeof raw === 'object') return raw;
+  try { return JSON.parse(raw); } catch { return {}; }
+}
+
+function forwardRequest({ url, headers, body }, cb) {
+  let parsed;
+  try { parsed = new URL(url); } catch (e) { return cb(e); }
+  const lib = parsed.protocol === 'https:' ? https : http;
+  const opts = {
+    method: 'POST',
+    hostname: parsed.hostname,
+    port: parsed.port || (parsed.protocol === 'https:' ? 443 : 80),
+    path: parsed.pathname + parsed.search,
+    headers,
+  };
+  const r = lib.request(opts, resp => {
+    let buf = '';
+    resp.on('data', c => buf += c);
+    resp.on('end', () => {
+      let data = null;
+      try { data = JSON.parse(buf); } catch { data = buf; }
+      cb(null, resp.statusCode, data);
+    });
+  });
+  r.on('error', err => cb(err));
+  r.setTimeout(120000, () => { r.destroy(new Error('Upstream request timed out')); });
+  r.write(body);
+  r.end();
+}
+
+// ─── Static file serving ────────────────────────────────────────────────────
+function routeStatic(req, res) {
+  if (req.method !== 'GET') return false;
+
   const STATIC = {
     '/':           { file: 'index.html', type: 'text/html; charset=utf-8' },
     '/index.html': { file: 'index.html', type: 'text/html; charset=utf-8' },
     '/index.css':  { file: 'index.css',  type: 'text/css; charset=utf-8' },
     '/HELP.md':    { file: 'HELP.md',    type: 'text/markdown; charset=utf-8' },
   };
-  if (req.method === 'GET' && STATIC[req.url]) {
+  if (STATIC[req.url]) {
     const { file, type } = STATIC[req.url];
-    fs.readFile(path.join(__dirname, file), (err, data) => {
-      if (err) {
-        res.writeHead(404);
-        res.end('File not found');
-        return;
-      }
-      res.writeHead(200, { 'Content-Type': type });
-      res.end(data);
-    });
-    return;
+    serveFile(res, path.join(ROOT, file), type);
+    return true;
   }
-
-  // ─── Serve js/ modules ───
-  if (req.method === 'GET' && req.url.startsWith('/js/')) {
+  if (req.url.startsWith('/js/')) {
     const name = path.basename(req.url);
-    const filePath = path.join(__dirname, 'js', name);
-    fs.readFile(filePath, (err, data) => {
-      if (err) {
-        res.writeHead(404);
-        res.end('File not found');
-        return;
-      }
-      res.writeHead(200, { 'Content-Type': 'application/javascript; charset=utf-8' });
-      res.end(data);
-    });
-    return;
+    serveFile(res, path.join(ROOT, 'js', name), 'application/javascript; charset=utf-8');
+    return true;
   }
+  return false;
+}
 
-  res.writeHead(404);
-  res.end('Not found');
-});
+function serveFile(res, filePath, type) {
+  fs.readFile(filePath, (err, data) => {
+    if (err) { send(res, 404, 'File not found'); return; }
+    res.writeHead(200, { 'Content-Type': type });
+    res.end(data);
+  });
+}
 
-server.listen(PORT, () => {
-  console.log(`\n  ⚡ Mermaid Studio running at http://localhost:${PORT}\n`);
-});
+// ─── Session helpers ────────────────────────────────────────────────────────
+function startSession(res, username) {
+  const token = crypto.randomBytes(32).toString('hex');
+  sessions.set(token, username);
+  res.setHeader('Set-Cookie', `session=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=2592000`);
+}
+
+function parseSessionCookie(req) {
+  const raw = req.headers.cookie || '';
+  const match = raw.match(/(?:^|;\s*)session=([^;]+)/);
+  return match ? match[1] : null;
+}
+
+function currentUser(req) {
+  const token = parseSessionCookie(req);
+  if (!token) return null;
+  return sessions.get(token) || null;
+}
+
+// ─── HTTP helpers ───────────────────────────────────────────────────────────
+function readJson(req) {
+  return new Promise((resolve, reject) => {
+    let body = '';
+    req.on('data', c => {
+      body += c;
+      if (body.length > 1e6) { req.destroy(); reject(new Error('Body too large')); }
+    });
+    req.on('end', () => {
+      if (!body) return resolve({});
+      try { resolve(JSON.parse(body)); }
+      catch { resolve({}); }
+    });
+    req.on('error', reject);
+  });
+}
+function send(res, status, text) {
+  res.writeHead(status, { 'Content-Type': 'text/plain; charset=utf-8' });
+  res.end(text);
+}
+function sendJson(res, status, obj) {
+  res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
+  res.end(JSON.stringify(obj));
+}
+
+// ─── File-backed JSON helpers ───────────────────────────────────────────────
+function readJson_(file) {
+  try {
+    if (!fs.existsSync(file)) return {};
+    return JSON.parse(fs.readFileSync(file, 'utf8') || '{}');
+  } catch (err) {
+    console.error(`Failed to read ${file}:`, err);
+    return {};
+  }
+}
+function writeJson_(file, obj) {
+  fs.writeFileSync(file, JSON.stringify(obj, null, 2));
+}
+
+// ─── Env file management ────────────────────────────────────────────────────
+function loadEnvFile() {
+  if (!fs.existsSync(ENV_FILE)) return;
+  const text = fs.readFileSync(ENV_FILE, 'utf8');
+  for (const line of text.split('\n')) {
+    const m = line.match(/^\s*([A-Z_][A-Z0-9_]*)\s*=\s*(.*)\s*$/);
+    if (m && !process.env[m[1]]) process.env[m[1]] = m[2];
+  }
+}
+function ensureEncryptionSecret() {
+  if (process.env.ENCRYPTION_SECRET) return;
+  const secret = crypto.randomBytes(32).toString('hex');
+  process.env.ENCRYPTION_SECRET = secret;
+  const existing = fs.existsSync(ENV_FILE) ? fs.readFileSync(ENV_FILE, 'utf8') : '';
+  const sep = existing && !existing.endsWith('\n') ? '\n' : '';
+  fs.writeFileSync(ENV_FILE, `${existing}${sep}ENCRYPTION_SECRET=${secret}\n`);
+  console.log('Generated new ENCRYPTION_SECRET → .env');
+}
