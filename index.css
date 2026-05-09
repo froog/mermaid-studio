@@ -395,6 +395,11 @@ textarea:focus, input:focus, button:focus-visible { outline: 1px solid var(--blu
 .ctx-item.danger:hover { background: rgba(248,81,73,0.12); color: var(--red); }
 .ctx-item .ctx-arrow { color: var(--text2); font-size: 10px; }
 .ctx-sep { height: 1px; background: var(--border); margin: 4px 0; }
+.ctx-item.info {
+  cursor: default; color: var(--orange); 
+  letter-spacing: 0.3px; 
+}
+.ctx-item.info:hover { background: transparent; color: var(--orange); }
 .ctx-submenu {
   position: fixed; z-index: 201; min-width: 160px;
   background: var(--bg2); border: 1px solid var(--border);

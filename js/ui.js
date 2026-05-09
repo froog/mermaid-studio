@@ -248,7 +248,7 @@ function showMenu(x, y, items) {
       return;
     }
     const el = document.createElement('div');
-    el.className = 'ctx-item' + (item.danger ? ' danger' : '');
+    el.className = 'ctx-item' + (item.danger ? ' danger' : '') + (item.info ? ' info' : '');
     const label = document.createElement('span');
     label.textContent = item.label;
     el.appendChild(label);
@@ -309,6 +309,9 @@ const ARROW_STYLES = [
 ];
 
 function menuItemsFor(entry, sourceId) {
+  const headerLabel = (entry.kind === 'cluster' ? 'subgraph' : entry.kind) + ': ' + sourceId;
+  const header = { label: headerLabel, info: true };
+
   const aiAction = () => {
     const tmpl = 'Transform this ' + entry.kind + ' ("' + sourceId + '") on line ' + (entry.line + 1) + ': ';
     chatInput.value = tmpl;
@@ -318,6 +321,8 @@ function menuItemsFor(entry, sourceId) {
 
   if (entry.kind === 'node') {
     return [
+      header,
+      'sep',
       { label: 'Rename node…', action: () => {
         const newId = window.prompt('New node ID:', sourceId);
         if (!newId || newId === sourceId) return;
@@ -387,6 +392,8 @@ function menuItemsFor(entry, sourceId) {
       rewriteEdgeLabel(entry.line, entry.from, entry.to, next);
     };
     return [
+      header,
+      'sep',
       { label: 'Rename edge…', action: renameAction },
       { label: 'Change arrow style', submenu: ARROW_STYLES.map(s => ({
         label: s.label,
@@ -401,6 +408,8 @@ function menuItemsFor(entry, sourceId) {
 
   if (entry.kind === 'cluster') {
     return [
+      header,
+      'sep',
       { label: 'Rename subgraph…', action: () => {
         const newId = window.prompt('New subgraph ID:', sourceId);
         if (!newId || newId === sourceId) return;
