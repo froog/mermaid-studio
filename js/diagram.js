@@ -60,7 +60,22 @@ function parseFlowchart(lines, masked) {
 
     if (t.startsWith('subgraph')) {
       const m = t.match(/^subgraph\s+([\w-]+)/);
-      if (m) addEntry(m[1], { kind: 'cluster', line: i, raw: t });
+      if (m) {
+        const sgId = m[1];
+        // Force-register as cluster, overwriting any prior node ref from an edge line
+        if (byId.has(sgId)) {
+          const old = byId.get(sgId);
+          const oldBucket = byLine.get(old.line);
+          if (oldBucket) {
+            const idx = oldBucket.indexOf(sgId);
+            if (idx >= 0) oldBucket.splice(idx, 1);
+          }
+        }
+        byId.set(sgId, { kind: 'cluster', line: i, raw: t });
+        const bucket = byLine.get(i) || [];
+        bucket.push(sgId);
+        byLine.set(i, bucket);
+      }
       continue;
     }
     if (t === 'end') continue;

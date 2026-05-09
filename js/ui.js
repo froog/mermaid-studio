@@ -58,12 +58,14 @@ function clearSvgHl() {
 function findTokenRange(lineText, entry, sourceId) {
   let m;
   if (entry.kind === 'node') {
-    m = lineText.match(new RegExp('\\b' + escapeRegex(sourceId) + '(?:\\[\\[|\\(\\[|\\(\\(|\\{\\{|\\[|\\(|\\{|>)?[^\\[\\]\\(\\)\\{\\}]*?(?:\\]\\]|\\]\\)|\\)\\)|\\}\\}|\\]|\\)|\\}|>)?'));
+    m = lineText.match(new RegExp('\\b' + escapeRegex(sourceId) + '\\b'));
     if (m) return { col: m.index, len: m[0].length };
   }
   if (entry.kind === 'edge' && entry.from && entry.to) {
-    m = lineText.match(new RegExp('\\b' + escapeRegex(entry.from) + '[\\s\\S]*?' + escapeRegex(entry.to) + '\\b'));
-    if (m) return { col: m.index, len: m[0].length };
+    const labelM = lineText.match(/\|([^|]+)\|/);
+    if (labelM) return { col: labelM.index, len: labelM[0].length };
+    const arrowM = lineText.match(EDGE_RE);
+    if (arrowM) return { col: arrowM.index, len: arrowM[0].length };
   }
   if (entry.kind === 'cluster') {
     m = lineText.match(new RegExp('\\b' + escapeRegex(sourceId) + '(?:\\s*\\[[^\\]]*\\])?'));
@@ -125,7 +127,7 @@ export function rewriteNodeLabel(lineIdx, nodeId, newLabel) {
   const lines = editor.value.split('\n');
   const quoted = quoteLabel(newLabel);
   lines[lineIdx] = lines[lineIdx].replace(
-    new RegExp('(\\b' + escapeRegex(nodeId) + ')(\\[\\[|\\(\\[|\\(\\(|\\{\\{|\\[|\\(|\\{|>)([^\\[\\]\\(\\)\\{\\}]*?)(\\]\\]|\\]\\)|\\)\\)|\\}\\}|\\]|\\)|\\}|>)'),
+    new RegExp('(\\b' + escapeRegex(nodeId) + ')(\\[\\[|\\(\\[|\\(\\(|\\{\\{|\\[|\\(|\\{|>)((?:"[^"]*"|[^\\[\\]\\(\\)\\{\\}"]*)*)(\\]\\]|\\]\\)|\\)\\)|\\}\\}|\\]|\\)|\\}|>)'),
     (_, id, open, _lbl, close) => id + open + quoted + close
   );
   setCode(lines.join('\n'));
@@ -134,7 +136,7 @@ export function rewriteNodeLabel(lineIdx, nodeId, newLabel) {
 export function rewriteNodeShape(lineIdx, nodeId, newOpen, newClose) {
   const lines = editor.value.split('\n');
   lines[lineIdx] = lines[lineIdx].replace(
-    new RegExp('(\\b' + escapeRegex(nodeId) + ')(\\[\\[|\\(\\[|\\(\\(|\\{\\{|\\[|\\(|\\{|>)([^\\[\\]\\(\\)\\{\\}]*?)(\\]\\]|\\]\\)|\\)\\)|\\}\\}|\\]|\\)|\\}|>)'),
+    new RegExp('(\\b' + escapeRegex(nodeId) + ')(\\[\\[|\\(\\[|\\(\\(|\\{\\{|\\[|\\(|\\{|>)((?:"[^"]*"|[^\\[\\]\\(\\)\\{\\}"]*)*)(\\]\\]|\\]\\)|\\)\\)|\\}\\}|\\]|\\)|\\}|>)'),
     (_, id, _open, label) => id + newOpen + label + newClose
   );
   setCode(lines.join('\n'));
@@ -296,10 +298,36 @@ function menuItemsFor(entry, sourceId) {
     return [
       { label: 'Reveal in editor', action: revealAction },
       'sep',
-      { label: 'Rename label…', action: () => {
-        const cur = (entry.raw.match(/[\[\(\{>]([^\]\)\}]*)/) || [])[1] || sourceId;
-        const label = window.prompt('New label:', cur.replace(/^"|"$/g, ''));
-        if (label != null) rewriteNodeLabel(entry.line, sourceId, label);
+      { label: 'Rename node…', action: () => {
+        const newId = window.prompt('New node ID:', sourceId);
+        if (!newId || newId === sourceId) return;
+        if (!/^[A-Za-z_][\w-]*$/.test(newId)) {
+          window.alert('Node IDs must start with a letter or underscore and contain only letters, digits, underscores, or hyphens.');
+          return;
+        }
+        setCode(editor.value.replace(new RegExp('\\b' + escapeRegex(sourceId) + '\\b', 'g'), newId));
+      }},
+      { label: 'Edit label…', action: () => {
+        const m = entry.raw.match(new RegExp('\\b' + escapeRegex(sourceId) + '(?:\\[\\[|\\(\\[|\\(\\(|\\{\\{|\\[|\\(|\\{|>)((?:"[^"]*"|[^\\[\\]\\(\\)\\{\\}"]*)*)'));
+        const cur = m ? m[1].replace(/^"|"$/g, '') : '';
+        const label = window.prompt(m ? 'Edit label:' : 'Add label:', cur);
+        if (label == null) return;
+        if (m) {
+          rewriteNodeLabel(entry.line, sourceId, label);
+        } else if (renderState && renderState.diagramType === 'state') {
+          if (!label) return;
+          const lines = editor.value.split('\n');
+          const headerIdx = lines.findIndex(l => /^\s*stateDiagram/.test(l));
+          lines.splice(headerIdx >= 0 ? headerIdx + 1 : entry.line + 1, 0, '    state "' + label + '" as ' + sourceId);
+          setCode(lines.join('\n'));
+        } else {
+          const lines = editor.value.split('\n');
+          lines[entry.line] = lines[entry.line].replace(
+            new RegExp('\\b' + escapeRegex(sourceId) + '\\b'),
+            sourceId + '[' + quoteLabel(label) + ']'
+          );
+          setCode(lines.join('\n'));
+        }
       }},
       { label: 'Change shape', submenu: SHAPES.map(s => ({
         label: s.label,
