@@ -836,8 +836,40 @@
 
   // ─── Hover Highlight ───
   const hlBand = document.getElementById('editor-highlight');
+  const hlToken = document.getElementById('editor-token-highlight');
 
-  function hlEditorLine(lineIdx, fromSvg) {
+  // Measure monospace char width once (JetBrains Mono 13px).
+  let charWidth = 7.8;
+  (() => {
+    const s = document.createElement('span');
+    s.style.cssText = "position:absolute;visibility:hidden;font-family:'JetBrains Mono',monospace;font-size:13px;white-space:pre;";
+    s.textContent = 'x'.repeat(80);
+    document.body.appendChild(s);
+    charWidth = s.getBoundingClientRect().width / 80;
+    s.remove();
+  })();
+
+  // Return {col, len} of the best token span for entry within lineText.
+  function findTokenRange(lineText, entry, sourceId) {
+    let m;
+    if (entry.kind === 'node') {
+      m = lineText.match(new RegExp('\\b' + escapeRegex(sourceId) + '(?:\\[\\[|\\(\\[|\\(\\(|\\{\\{|\\[|\\(|\\{|>)?[^\\[\\]\\(\\)\\{\\}]*?(?:\\]\\]|\\]\\)|\\)\\)|\\}\\}|\\]|\\)|\\}|>)?'));
+      if (m) return { col: m.index, len: m[0].length };
+    }
+    if (entry.kind === 'edge' && entry.from && entry.to) {
+      m = lineText.match(new RegExp('\\b' + escapeRegex(entry.from) + '[\\s\\S]*?' + escapeRegex(entry.to) + '\\b'));
+      if (m) return { col: m.index, len: m[0].length };
+    }
+    if (entry.kind === 'cluster') {
+      m = lineText.match(new RegExp('\\b' + escapeRegex(sourceId) + '(?:\\s*\\[[^\\]]*\\])?'));
+      if (m) return { col: m.index, len: m[0].length };
+    }
+    const id = sourceId.split('-')[0];
+    const idx = lineText.indexOf(id);
+    return idx >= 0 ? { col: idx, len: id.length } : null;
+  }
+
+  function hlEditorLine(lineIdx, fromSvg, sourceId) {
     if (lineIdx == null || !renderState) { clearEditorHl(); return; }
     const lh = 21;
     const top = lineIdx * lh + 14 - editor.scrollTop;
@@ -847,11 +879,30 @@
     lineNumbers.querySelectorAll('.line-num.hl').forEach(el => el.classList.remove('hl', 'svg-hl'));
     const row = lineNumbers.querySelector(`.line-num[data-line="${lineIdx}"]`);
     if (row) { row.classList.add('hl'); if (fromSvg) row.classList.add('svg-hl'); }
+
+    // Token highlight: only when triggered from SVG hover
+    if (fromSvg && sourceId && renderState.byElementId.has(sourceId)) {
+      const entry = renderState.byElementId.get(sourceId);
+      const lineText = renderState.sourceLines[lineIdx] || '';
+      const range = findTokenRange(lineText, entry, sourceId);
+      if (range) {
+        const leftPad = 44 + 16; // gutter + editor padding-left
+        hlToken.style.left = (leftPad + range.col * charWidth) + 'px';
+        hlToken.style.width = (range.len * charWidth) + 'px';
+        hlToken.style.top = top + 'px';
+        hlToken.style.display = 'block';
+      } else {
+        hlToken.style.display = 'none';
+      }
+    } else {
+      hlToken.style.display = 'none';
+    }
   }
 
   function clearEditorHl() {
     hlBand.style.display = 'none';
     hlBand.classList.remove('svg-hl');
+    hlToken.style.display = 'none';
     lineNumbers.querySelectorAll('.line-num.hl').forEach(el => el.classList.remove('hl', 'svg-hl'));
   }
 
@@ -875,7 +926,7 @@
     if (!el) { clearEditorHl(); return; }
     const entry = renderState.byElementId.get(el.dataset.msId);
     if (!entry) { clearEditorHl(); return; }
-    hlEditorLine(entry.line, true);
+    hlEditorLine(entry.line, true, el.dataset.msId);
     hlSvgId(el.dataset.msId);
   });
 

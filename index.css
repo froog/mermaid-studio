@@ -247,6 +247,12 @@ textarea:focus, input:focus, button:focus-visible { outline: 1px solid var(--blu
   border-left: 2px solid var(--purple);
   left: 42px;
 }
+#editor-token-highlight {
+  position: absolute; height: 21px;
+  background: rgba(188,140,255,0.38);
+  border-radius: 3px; pointer-events: none;
+  display: none; z-index: 1;
+}
 .line-num.hl { background: rgba(88,166,255,0.15); color: var(--blue); }
 .line-num.hl.svg-hl { background: rgba(188,140,255,0.25); color: var(--purple); }
 
