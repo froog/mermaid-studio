@@ -125,10 +125,10 @@ function quoteLabel(label) {
 
 export function rewriteNodeLabel(lineIdx, nodeId, newLabel) {
   const lines = editor.value.split('\n');
-  const quoted = quoteLabel(newLabel);
+  const trimmed = newLabel.trim();
   lines[lineIdx] = lines[lineIdx].replace(
     new RegExp('(\\b' + escapeRegex(nodeId) + ')(\\[\\[|\\(\\[|\\(\\(|\\{\\{|\\[|\\(|\\{|>)((?:"[^"]*"|[^\\[\\]\\(\\)\\{\\}"]*)*)(\\]\\]|\\]\\)|\\)\\)|\\}\\}|\\]|\\)|\\}|>)'),
-    (_, id, open, _lbl, close) => id + open + quoted + close
+    (_, id, open, _lbl, close) => trimmed ? id + open + quoteLabel(trimmed) + close : id
   );
   setCode(lines.join('\n'));
 }
