@@ -49,7 +49,6 @@ const server = http.createServer((req, res) => {
   const STATIC = {
     '/':           { file: 'index.html', type: 'text/html; charset=utf-8' },
     '/index.html': { file: 'index.html', type: 'text/html; charset=utf-8' },
-    '/index.js':   { file: 'index.js',   type: 'application/javascript; charset=utf-8' },
     '/index.css':  { file: 'index.css',  type: 'text/css; charset=utf-8' },
     '/HELP.md':    { file: 'HELP.md',    type: 'text/markdown; charset=utf-8' },
   };
@@ -62,6 +61,22 @@ const server = http.createServer((req, res) => {
         return;
       }
       res.writeHead(200, { 'Content-Type': type });
+      res.end(data);
+    });
+    return;
+  }
+
+  // ─── Serve js/ modules ───
+  if (req.method === 'GET' && req.url.startsWith('/js/')) {
+    const name = path.basename(req.url);
+    const filePath = path.join(__dirname, 'js', name);
+    fs.readFile(filePath, (err, data) => {
+      if (err) {
+        res.writeHead(404);
+        res.end('File not found');
+        return;
+      }
+      res.writeHead(200, { 'Content-Type': 'application/javascript; charset=utf-8' });
       res.end(data);
     });
     return;

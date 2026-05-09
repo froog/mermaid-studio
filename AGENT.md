@@ -5,7 +5,7 @@ Working notes for AI agents (and humans) maintaining this repo.
 ## What's built
 
 - Three-pane SPA: editor, live preview, AI chat.
-- Static frontend (`index.html` / `index.css` / `index.js`); `server.js` proxies chat to OpenRouter.
+- Static frontend (`index.html` / `index.css` / `js/`); `server.js` proxies chat to OpenRouter.
 - Mermaid 11.14.0 via jsDelivr; `marked` 14 for the help modal.
 - AI chat scoped to Mermaid via system prompt; off-topic prompts refused.
 - Editor: line numbers, tab-to-4-spaces, debounced render (~400 ms).
@@ -15,15 +15,20 @@ Working notes for AI agents (and humans) maintaining this repo.
 - Examples dropdown: Flowchart, Sequence, Class, State, Gantt, Sankey, Architecture, Radar, Tree, XY Chart.
 - File `↑ Upload` (any text → new chat titled with filename, seeded with diagram message) and `↓ Download` (saves editor as `<chat-title>.mmd`).
 - Help modal: `?` button → fetches `HELP.md`, renders with marked, Esc/×/backdrop to close.
-- `MODEL` constant at top of `index.js` for swapping the OpenRouter model.
+- `MODEL` constant in `js/config.js` for swapping the OpenRouter model.
 - Interactive preview: right-click rendered SVG nodes/edges/clusters → context menu. Bidirectional hover between gutter and SVG (`data-ms-id` attribute links them). Source map (`renderState`) rebuilt on every successful render.
 
 ## Conventions
 
-- No build step, no framework. Vanilla JS in one IIFE.
+- No build step, no framework. Vanilla JS as native ES modules (`js/` subdirectory).
+- Entry point: `<script type="module" src="./js/main.js">` in `index.html`.
+- Module files: `js/config.js`, `js/dom.js`, `js/store.js`, `js/diagram.js`, `js/editor.js`, `js/chat.js`, `js/ui.js`, `js/main.js`.
+- Dep order (no cycles): config → dom → store → diagram → editor → chat → ui → main.
+- CDN globals (`mermaid`, `marked`) remain on `window` — accessible from any module.
+- Mutable shared state lives in `store.js` as live `export let` bindings; only store.js reassigns them (e.g. `setActiveChat`, `setChatLoading`, `setPendingEdge`).
 - Don't add npm deps — server uses Node built-ins only.
 - Keep CSS in `index.css`. Don't reintroduce inline `<style>`.
-- Server static routes are an explicit table in `server.js`. Add new files there.
+- Server serves `js/` modules via a wildcard `/js/*` handler using `path.basename` for path-traversal safety. Add new JS files to `js/` — no server changes needed.
 - Greeting message is **ephemeral** (UI only, never persisted). The `showGreeting` flag distinguishes new-chat from file/example seeding.
 - Auto-applying replies relies on the first ` ```mermaid ` block in the assistant message. Don't change that contract without updating both ends.
 - Prompt tweaks live in `sendMessage()`; they include scope guardrails and Mermaid label-quoting rules — don't drop those.
@@ -59,6 +64,7 @@ Working notes for AI agents (and humans) maintaining this repo.
 | `b07c33a` | Drop `DEFAULT_CODE`; first example as fallback |
 | `b1335e1` | `HELP.md` + scrollable help modal (marked) |
 | `6ed6c4b` | Lift model to `MODEL` constant |
+| *(local)*  | Split `index.js` into ES modules in `js/` |
 
 ## Next steps
 
