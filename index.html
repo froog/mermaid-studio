@@ -150,10 +150,18 @@
         <span>Model</span>
         <input id="settings-custom-model" type="text" placeholder="my-model">
       </label>
-      <label class="settings-field">
+      <div class="settings-field" id="settings-custom-key-row">
         <span>API key (optional)</span>
-        <input id="settings-custom-key" type="password" placeholder="leave blank for local models">
-      </label>
+        <div class="settings-key-row">
+          <input id="settings-custom-key" type="password" placeholder="leave blank for local models">
+          <button id="settings-custom-key-save" type="button" class="settings-btn-mini">Save</button>
+          <button id="settings-custom-key-delete" type="button" class="settings-btn-mini settings-btn-danger is-hidden">Remove</button>
+        </div>
+        <div id="settings-custom-key-status" class="settings-key-status"></div>
+      </div>
+      <div id="settings-custom-key-locked" class="settings-locked-msg is-hidden">
+        Sign in to store an API key for this endpoint.
+      </div>
       <label class="settings-checkbox">
         <input id="settings-custom-compat" type="checkbox" checked>
         <span>OpenAI-compatible request format</span>
@@ -162,7 +170,6 @@
         <span>Custom headers (JSON)</span>
         <textarea id="settings-custom-headers" rows="4" placeholder='{"X-My-Header": "value"}'></textarea>
       </label>
-      <button id="settings-custom-use" type="button" class="settings-btn-mini">Use this endpoint</button>
     </section>
 
     <section class="settings-section">
