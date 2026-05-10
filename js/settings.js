@@ -37,7 +37,6 @@ const DEFAULTS = {
   custom: {
     baseUrl: '',
     model: '',
-    apiKey: '',
     openaiCompatible: true,
     headers: '',
   },
@@ -104,12 +103,14 @@ const customSection = $('settings-custom-section');
 const customUrl = $('settings-custom-url');
 const customModel = $('settings-custom-model');
 const customKey = $('settings-custom-key');
+const customKeyRow = $('settings-custom-key-row');
+const customKeySaveBtn = $('settings-custom-key-save');
+const customKeyDeleteBtn = $('settings-custom-key-delete');
+const customKeyStatus = $('settings-custom-key-status');
+const customKeyLocked = $('settings-custom-key-locked');
 const customCompat = $('settings-custom-compat');
 const customHeadersRow = $('settings-custom-headers-row');
 const customHeaders = $('settings-custom-headers');
-const customUseBtn = $('settings-custom-use');
-const systemPromptArea = $('settings-system-prompt');
-const promptResetBtn = $('settings-prompt-reset');
 
 // ─── Open/close ─────────────────────────────────────────────────────────
 function open() {
@@ -157,6 +158,7 @@ function applyProvider(name) {
     hide(keyRow);
     hide(keyLocked);
     show(customSection);
+    refreshCustomKeyRow();
     savePrefs();
     return;
   }
@@ -296,7 +298,6 @@ keyDeleteBtn.addEventListener('click', deleteProviderKey);
 function loadCustomIntoForm() {
   customUrl.value = prefs.custom.baseUrl;
   customModel.value = prefs.custom.model;
-  customKey.value = prefs.custom.apiKey;
   customCompat.checked = prefs.custom.openaiCompatible;
   customHeaders.value = prefs.custom.headers;
   if (customCompat.checked) hide(customHeadersRow); else show(customHeadersRow);
@@ -304,50 +305,98 @@ function loadCustomIntoForm() {
 function persistCustomFromForm() {
   prefs.custom.baseUrl = customUrl.value.trim();
   prefs.custom.model = customModel.value.trim();
-  prefs.custom.apiKey = customKey.value;
   prefs.custom.openaiCompatible = customCompat.checked;
   prefs.custom.headers = customHeaders.value;
   savePrefs();
 }
-[customUrl, customModel, customKey, customHeaders].forEach(el =>
+[customUrl, customModel, customHeaders].forEach(el =>
   el.addEventListener('change', persistCustomFromForm)
 );
 customCompat.addEventListener('change', () => {
   if (customCompat.checked) hide(customHeadersRow); else show(customHeadersRow);
   persistCustomFromForm();
 });
-customUseBtn.addEventListener('click', () => {
-  persistCustomFromForm();
-  if (!prefs.custom.baseUrl || !prefs.custom.model) {
-    alert('Set both Base URL and Model first.');
+
+function refreshCustomKeyRow() {
+  if (!getCurrentUser()) {
+    hide(customKeyRow);
+    show(customKeyLocked);
     return;
   }
-  applyProvider('custom');
-});
-
-// ─── System prompt ──────────────────────────────────────────────────────
-function loadSystemPromptIntoForm() {
-  systemPromptArea.value = prefs.systemPrompt;
+  show(customKeyRow);
+  hide(customKeyLocked);
+  customKey.value = '';
+  customKeyStatus.textContent = '';
+  customKeyStatus.className = 'settings-key-status';
+  const stored = storedKeyProviders.has('custom');
+  if (stored) show(customKeyDeleteBtn); else hide(customKeyDeleteBtn);
+  customKey.placeholder = stored ? 'Stored — paste a new key to replace' : 'leave blank for local models';
 }
-systemPromptArea.addEventListener('change', () => {
-  prefs.systemPrompt = systemPromptArea.value;
-  savePrefs();
-});
-promptResetBtn.addEventListener('click', () => {
-  prefs.systemPrompt = DEFAULT_SYSTEM_PROMPT;
-  systemPromptArea.value = prefs.systemPrompt;
-  savePrefs();
-});
+
+async function saveCustomKey() {
+  const apiKey = customKey.value.trim();
+  if (!apiKey) {
+    customKeyStatus.textContent = 'Enter a key first.';
+    customKeyStatus.className = 'settings-key-status err';
+    return;
+  }
+  customKeySaveBtn.disabled = true;
+  try {
+    const res = await fetch('/api/keys', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ provider: 'custom', apiKey }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `Error ${res.status}`);
+    storedKeyProviders.add('custom');
+    customKey.value = '';
+    customKeyStatus.textContent = 'Saved.';
+    customKeyStatus.className = 'settings-key-status ok';
+    show(customKeyDeleteBtn);
+    customKey.placeholder = 'Stored — paste a new key to replace';
+  } catch (err) {
+    customKeyStatus.textContent = err.message;
+    customKeyStatus.className = 'settings-key-status err';
+  } finally {
+    customKeySaveBtn.disabled = false;
+  }
+}
+
+async function deleteCustomKey() {
+  if (!confirm('Remove stored custom endpoint key?')) return;
+  try {
+    await fetch('/api/keys/custom', { method: 'DELETE', credentials: 'same-origin' });
+    storedKeyProviders.delete('custom');
+    hide(customKeyDeleteBtn);
+    customKeyStatus.textContent = 'Removed.';
+    customKeyStatus.className = 'settings-key-status ok';
+    customKey.placeholder = 'leave blank for local models';
+  } catch (err) {
+    customKeyStatus.textContent = String(err);
+    customKeyStatus.className = 'settings-key-status err';
+  }
+}
+
+customKeySaveBtn.addEventListener('click', saveCustomKey);
+customKeyDeleteBtn.addEventListener('click', deleteCustomKey);
 
 // ─── React to auth state ────────────────────────────────────────────────
 onAuthChange(async () => {
   await refreshStoredKeys();
-  if (!panel.hidden) refreshKeyRow();
+  if (!panel.hidden) {
+    refreshKeyRow();
+    if (prefs.provider === 'custom') refreshCustomKeyRow();
+  }
 });
 
 // ─── Boot ───────────────────────────────────────────────────────────────
 loadCustomIntoForm();
 loadSystemPromptIntoForm();
 loadCatalog().then(refreshStoredKeys).then(() => {
-  if (!panel.hidden) refreshKeyRow();
+  if (!panel.hidden) {
+    refreshKeyRow();
+    if (prefs.provider === 'custom') refreshCustomKeyRow();
+  }
 });
