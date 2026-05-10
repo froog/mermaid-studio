@@ -73,6 +73,7 @@ function deleteActiveChat() {
 // ─── Burger menu ───
 const burgerBtn = document.getElementById('burger-btn');
 const burgerMenu = document.getElementById('burger-menu');
+const burgerItems = document.querySelectorAll('button.burger-item')
 burgerBtn.addEventListener('click', e => {
   e.stopPropagation();
   burgerMenu.hidden = !burgerMenu.hidden;
@@ -82,6 +83,7 @@ document.addEventListener('click', e => {
     burgerMenu.hidden = true;
   }
 });
+burgerItems.forEach(item => item.addEventListener('click', () => { burgerMenu.hidden = true; }));
 
 // ─── Example dropdown ───
 EXAMPLES.forEach((ex, i) => {
