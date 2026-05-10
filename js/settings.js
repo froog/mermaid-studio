@@ -112,7 +112,6 @@ const customKeyLocked = $('settings-custom-key-locked');
 const customCompat = $('settings-custom-compat');
 const customHeadersRow = $('settings-custom-headers-row');
 const customHeaders = $('settings-custom-headers');
-const customUseBtn = $('settings-custom-use');
 const systemPromptArea = $('settings-system-prompt');
 const promptResetBtn = $('settings-prompt-reset');
 
@@ -321,15 +320,6 @@ customCompat.addEventListener('change', () => {
   if (customCompat.checked) hide(customHeadersRow); else show(customHeadersRow);
   persistCustomFromForm();
 });
-customUseBtn.addEventListener('click', () => {
-  persistCustomFromForm();
-  if (!prefs.custom.baseUrl || !prefs.custom.model) {
-    alert('Set both Base URL and Model first.');
-    return;
-  }
-  applyProvider('custom');
-});
-
 // ─── System prompt ──────────────────────────────────────────────────────
 function loadSystemPromptIntoForm() {
   systemPromptArea.value = prefs.systemPrompt;
@@ -394,7 +384,9 @@ async function saveCustomKey() {
 async function deleteCustomKey() {
   if (!confirm('Remove stored custom endpoint key?')) return;
   try {
-    await fetch('/api/keys/custom', { method: 'DELETE', credentials: 'same-origin' });
+    const res = await fetch('/api/keys/custom', { method: 'DELETE', credentials: 'same-origin' });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `Error ${res.status}`);
     storedKeyProviders.delete('custom');
     hide(customKeyDeleteBtn);
     customKeyStatus.textContent = 'Removed.';
