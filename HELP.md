@@ -6,8 +6,8 @@ Mermaid Studio is a three-pane web app for writing [Mermaid](https://mermaid.js.
 
 | Pane | What it does |
 | --- | --- |
-| **Editor** (left) | The Mermaid source. Edit it freely; line numbers update as you type. |
-| **Preview** (middle) | The rendered diagram. Re-renders ~400 ms after you stop typing. |
+| **Edit** (left) | The Mermaid source. Edit it freely; Preview changes automatically |
+| **Preview** (middle) | The rendered diagram. Re-renders after you stop typing. Right click on elements for a context menu |
 | **Chat** (right) | Talk to the AI to generate or modify the diagram in the editor. |
 
 ## Top bar

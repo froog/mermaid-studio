@@ -224,6 +224,20 @@ textarea:focus, input:focus, select:focus, button:focus-visible {
   color: var(--fg-faint);
 }
 
+.fit-btn {
+  margin-left: auto;
+  display: flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px;
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--fg-dim);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: border-color 0.15s, color 0.15s;
+}
+.fit-btn:hover { border-color: var(--accent); color: var(--accent); }
+
 .chat-header { gap: 10px; }
 .chat-select {
   flex: 1; min-width: 0;
@@ -294,7 +308,7 @@ textarea:focus, input:focus, select:focus, button:focus-visible {
   color: var(--fg-faint);
 }
 .line-num.hl { color: var(--accent); }
-.line-num.hl.svg-hl { color: var(--accent2); }
+.line-num.hl.svg-hl { color: var(--accent); }
 
 #code-editor {
   flex: 1;
@@ -893,13 +907,12 @@ textarea:focus, input:focus, select:focus, button:focus-visible {
   z-index: 0;
 }
 #editor-highlight.svg-hl {
-  background: rgba(58, 138, 134, 0.18);
-  border-left: 2px solid var(--accent2);
+  border-left: 2px solid var(--accent);
 }
 #editor-token-highlight {
   position: absolute;
   height: 24px;
-  background: rgba(58, 138, 134, 0.32);
+  background: var(--accent-soft);
   border-radius: 4px;
   pointer-events: none;
   display: none;
@@ -1045,10 +1058,10 @@ textarea:focus, input:focus, select:focus, button:focus-visible {
 .ctx-item.info {
   cursor: default;
   font-style: italic;
-  color: var(--accent2);
+  color: var(--accent);
   font-size: 13px;
 }
-.ctx-item.info:hover { background: transparent; color: var(--accent2); }
+.ctx-item.info:hover { background: transparent; color: var(--accent); }
 .ctx-submenu {
   position: fixed;
   z-index: 201;

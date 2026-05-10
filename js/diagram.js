@@ -1,5 +1,5 @@
 import { escapeRegex } from './config.js';
-import { editor, diagramContent } from './dom.js';
+import { editor, diagramContent, fitBtn } from './dom.js';
 import { pendingEdge } from './store.js';
 
 // Order matters: longer / more-specific alternatives must precede shorter
@@ -386,3 +386,4 @@ window.addEventListener('mouseup', () => {
   diagramContent.classList.remove('panning');
 });
 diagramContent.addEventListener('dblclick', () => { fitDiagram(); });
+fitBtn.addEventListener('click', () => { fitDiagram(); });

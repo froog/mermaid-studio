@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="light">
+<html lang="en" data-theme="dark">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -63,6 +63,11 @@
       <div class="pane-header">
         <span class="pane-dot"></span>
         <span class="pane-title">Preview</span>
+        <button id="fit-btn" class="fit-btn" title="Zoom to fit">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M1 4V1h3M10 1h3v3M13 10v3h-3M4 13H1v-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
       </div>
       <div class="diagram-content" id="diagram-content">
         <span class="placeholder">Loading Mermaid…</span>
@@ -219,10 +224,10 @@
   (function () {
     const root = document.documentElement;
     const saved = localStorage.getItem('tide-theme');
-    if (saved === 'dark') root.dataset.theme = 'dark';
+    if (saved === 'light') root.dataset.theme = 'light';
     document.addEventListener('click', (e) => {
       if (e.target.closest('#theme-toggle')) {
-        root.dataset.theme = root.dataset.theme === 'dark' ? 'light' : 'dark';
+        root.dataset.theme = root.dataset.theme === 'light' ? 'dark' : 'light';
         localStorage.setItem('tide-theme', root.dataset.theme);
       }
     });

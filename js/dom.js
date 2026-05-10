@@ -14,6 +14,7 @@ export const ctxMenu = document.getElementById('ctx-menu');
 export const loadBtn = document.getElementById('load-btn');
 export const loadInput = document.getElementById('load-input');
 export const downloadBtn = document.getElementById('download-btn');
+export const fitBtn = document.getElementById('fit-btn');
 export const helpBtn = document.getElementById('help-btn');
 export const helpModal = document.getElementById('help-modal');
 export const helpContent = document.getElementById('help-content');

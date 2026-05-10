@@ -22,7 +22,7 @@ function hlEditorLine(lineIdx, fromSvg, sourceId) {
     const lineText = renderState.sourceLines[lineIdx] || '';
     const range = findTokenRange(lineText, entry, sourceId);
     if (range) {
-      const leftPad = 44 + 16;
+      const leftPad = editor.offsetLeft + parseInt(getComputedStyle(editor).paddingLeft, 10);
       hlToken.style.left = (leftPad + range.col * charWidth) + 'px';
       hlToken.style.width = (range.len * charWidth) + 'px';
       hlToken.style.top = top + 'px';
@@ -58,7 +58,9 @@ function clearSvgHl() {
 function findTokenRange(lineText, entry, sourceId) {
   let m;
   if (entry.kind === 'node') {
-    m = lineText.match(new RegExp('\\b' + escapeRegex(sourceId) + '\\b'));
+    // Match id + optional shape/label: A[text], B{text}, C(text), D((text)), E([text]), F[[text]], G[(text)], H>text]
+    const shapeRe = '(?:\\s*(?:\\[\\[.*?\\]\\]|\\[\\(.*?\\)\\]|\\(\\(.*?\\)\\)|\\(\\[.*?\\]\\)|\\[.*?\\]|\\{.*?\\}|\\(.*?\\)|>.*?\\]))?';
+    m = lineText.match(new RegExp('\\b' + escapeRegex(sourceId) + '\\b' + shapeRe));
     if (m) return { col: m.index, len: m[0].length };
   }
   if (entry.kind === 'edge' && entry.from && entry.to) {
