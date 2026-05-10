@@ -16,6 +16,16 @@ Mermaid Studio is a three-pane web app for writing [Mermaid](https://mermaid.js.
 - **↑ Upload** — load a `.mmd` or `.txt` file. Opens as a new chat named after the file (extension included), with the file contents seeded as the first chat message.
 - **↓ Download** — save the current editor contents as `<chat-title>.mmd`.
 
+## Settings
+
+**⚙ Settings** (top bar) — choose your AI provider and model, and paste the API key for that provider. Keys are encrypted server-side with AES-256-GCM and never sent to the browser. Requires being signed in.
+
+## Account
+
+AI features (chat) require a local account. Click **Sign in** in the burger menu (☰) to create one or log in.
+
+If you were given a demo link (`/?demo=…`), you are signed in automatically — no action needed.
+
 ## Editor
 
 - Tab inserts four spaces.
@@ -27,6 +37,8 @@ Mermaid Studio is a three-pane web app for writing [Mermaid](https://mermaid.js.
 - **Mouse wheel** — zoom in/out, centred on the cursor. The SVG is re-rasterised at each zoom level so it stays sharp.
 - **Click and drag** — pan around the diagram.
 - **Double-click** — reset to fit-to-pane.
+
+**Right-click any node, edge, or subgraph** to get a context menu with options to rename, reshape, or ask the AI to transform just that element.
 
 ## Chat pane
 
