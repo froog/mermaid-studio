@@ -10,25 +10,14 @@ Mermaid Studio is a three-pane web app for writing [Mermaid](https://mermaid.js.
 | **Preview** (middle) | The rendered diagram. Re-renders after you stop typing. Right click on elements for a context menu |
 | **Chat** (right) | Talk to the AI to generate or modify the diagram in the editor. |
 
-## Top bar
-
-- **Examples ▾** — pick a starter diagram (Flowchart, Sequence, Class, State, Gantt, Sankey, Architecture, Radar, Tree, XY Chart). Each pick opens as a new chat titled `Example - <Type>`.
-- **↑ Upload** — load a `.mmd` or `.txt` file. Opens as a new chat named after the file (extension included), with the file contents seeded as the first chat message.
-- **↓ Download** — save the current editor contents as `<chat-title>.mmd`.
-
-## Settings
-
-**⚙ Settings** (top bar) — choose your AI provider and model, and paste the API key for that provider. Keys are encrypted server-side with AES-256-GCM and never sent to the browser. Requires being signed in.
-
 ## Account
 
-AI features (chat) require a local account. Click **Sign in** in the burger menu (☰) to create one or log in.
+AI features (chat) require a local account. Click **Sign in** in the menu (☰) to create one or log in.
 
 If you were given a demo link (`/?demo=…`), you are signed in automatically — no action needed.
 
 ## Editor
 
-- Tab inserts four spaces.
 - Edits auto-save into the active chat (no Save button).
 - Errors show in the Preview pane with the raw message from Mermaid — fix the source and the preview catches up automatically.
 
@@ -36,7 +25,7 @@ If you were given a demo link (`/?demo=…`), you are signed in automatically �
 
 - **Mouse wheel** — zoom in/out, centred on the cursor. The SVG is re-rasterised at each zoom level so it stays sharp.
 - **Click and drag** — pan around the diagram.
-- **Double-click** — reset to fit-to-pane.
+- **Double-click** or click **⛶** (top-right of pane) — zoom to fit the diagram.
 
 **Right-click any node, edge, or subgraph** to get a context menu with options to rename, reshape, or ask the AI to transform just that element.
 
@@ -57,14 +46,30 @@ Above the messages:
 
 All chats persist to `localStorage` under `mermaid-studio:v1` and survive page reloads.
 
+## Menu (☰)
+
+- **Upload** — load a `.mmd` or `.txt` file. Opens as a new chat named after the file.
+- **Download** — save the current editor contents as `<chat-title>.mmd`.
+- **Examples** — pick a starter diagram (Flowchart, Sequence, Class, State, Gantt, Sankey, Architecture, Radar, Tree, XY Chart). Opens as a new chat titled `Example - <Type>`.
+- **Settings** — opens the settings panel.
+- **Help** — opens this help panel.
+- **Sign in / Sign out** — account access.
+
+## Settings
+
+- **Provider & model** — choose your AI provider and model from dropdowns. For OpenRouter or Custom, type a model ID directly.
+- **API key** — paste the key for the selected provider. Encrypted server-side with AES-256-GCM, never sent to the browser. Requires being signed in.
+- **Custom endpoint** — base URL, model, optional API key, and custom headers for any OpenAI-compatible host (Ollama, vLLM, LM Studio, etc.).
+- **System prompt** — customise the assistant's instructions. Reset to default at any time.
+
 ## Tips
 
 - To branch, use **+** to create a new chat, then paste or upload your starting diagram.
 - If a diagram fails to parse, the assistant can usually fix it — paste the error or just say "fix the syntax".
-- The `Examples ▾` dropdown is also a good way to learn syntax: open one, then ask the assistant to modify it.
+- The `Examples` dropdown is also a good way to learn syntax: open one, then ask the assistant to modify it.
 
 ## Troubleshooting
 
 - **`No diagram type detected …`** — your Mermaid version may not support that diagram (e.g. `radar-beta` needs ≥ 11.6). Mermaid Studio currently uses 11.14.0.
-- **Network error in chat** — the server is down or `OPENROUTER_API_KEY` is missing/invalid.
+- **Network error in chat** — the server is down, or no API key is saved for the selected provider (set one in Settings).
 - **Reset everything** — open DevTools → Application → Local Storage → delete `mermaid-studio:v1` and reload.
