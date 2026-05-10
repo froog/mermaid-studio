@@ -1,6 +1,5 @@
 export const editor = document.getElementById('code-editor');
 export const lineNumbers = document.getElementById('line-numbers');
-export const lineCount = document.getElementById('line-count');
 export const diagramContent = document.getElementById('diagram-content');
 export const chatScroll = document.getElementById('chat-scroll');
 export const chatInput = document.getElementById('chat-input');

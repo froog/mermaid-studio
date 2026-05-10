@@ -1,4 +1,4 @@
-import { editor, lineNumbers, lineCount, chatSelect, downloadBtn } from './dom.js';
+import { editor, lineNumbers, chatSelect, downloadBtn } from './dom.js';
 import { activeChat, store, saveStore, deriveTitle } from './store.js';
 import { scheduleRender } from './diagram.js';
 
@@ -15,7 +15,6 @@ export let charWidth = 7.8;
 
 export function updateLineNumbers() {
   const lines = editor.value.split('\n');
-  lineCount.textContent = lines.length + ' lines';
   lineNumbers.textContent = '';
   for (let i = 0; i < lines.length; i++) {
     const d = document.createElement('div');

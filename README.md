@@ -23,6 +23,13 @@ node server.js
 
 Then open <http://localhost:3000>. On first run it generates `.env` with an `ENCRYPTION_SECRET` used to encrypt stored API keys.
 
+To run detached, or in production use a tool like [PM2](https://github.com/Unitech/pm2)
+
+```sh
+npm install pm2 -g
+pm2 start server.js
+```
+
 ## First-time setup
 
 1. Click **Sign in** in the chat pane and create an account (local — username + password).

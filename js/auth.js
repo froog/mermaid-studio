@@ -41,14 +41,14 @@ function renderAuthStatus() {
     authStatus.appendChild(span);
 
     const out = document.createElement('button');
-    out.className = 'auth-link';
+    out.className = 'burger-item';
     out.type = 'button';
     out.textContent = 'Sign out';
     out.addEventListener('click', logout);
     authStatus.appendChild(out);
   } else {
     const inBtn = document.createElement('button');
-    inBtn.className = 'auth-link';
+    inBtn.className = 'burger-item';
     inBtn.type = 'button';
     inBtn.textContent = 'Sign in';
     inBtn.addEventListener('click', openDialog);
