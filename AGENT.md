@@ -79,3 +79,5 @@ Working notes for AI agents (and humans) maintaining this repo.
 - Context menu multi-select (e.g. wrap multiple nodes in subgraph) — deferred.
 - In-textarea-body hover (mouse Y / lineHeight) — deferred; gutter hover ships first.
 - Keyboard navigation of context menu — mouse-only in v1.
+
+- Add feature to rename edges eg; "Rename edge..." when right clicking on an edge

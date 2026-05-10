@@ -1,6 +1,12 @@
 # Mermaid Studio
 
-A minimal browser-based studio for authoring and previewing [Mermaid](https://mermaid.js.org/) diagrams, with AI-assisted generation through any of nine LLM providers (or a custom OpenAI-compatible endpoint).
+A minimal browser-based studio for authoring and previewing [Mermaid](https://mermaid.js.org/) diagrams, with AI-assisted generation.
+
+🪄 Live editor + preview + AI chat in one window.
+🔌 Pick your LLM: Anthropic, OpenAI, Gemini, Mistral, Ollama + more, or your own custom OpenAI-compatible endpoint.
+🔐 Bring your own keys — stored encrypted server-side, never in the browser.
+🖱️ Easy context - Right-click any node/edge/subgraph to rename, reshape, or AI-transform it.
+📦 Zero npm deps, single node server.js, runs anywhere.
 
 The editor and preview work fully without an account. AI features require signing up locally so your API keys can be stored encrypted on disk and never live in the browser.
 

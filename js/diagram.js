@@ -2,7 +2,10 @@ import { escapeRegex } from './config.js';
 import { editor, diagramContent } from './dom.js';
 import { pendingEdge } from './store.js';
 
-export const EDGE_RE = /(--+>|--+|==+>|==+|-\.+->|-\.+-|<-->|<==>|--\|>|<\|--|o--|--o|\*--|--\*)/;
+// Order matters: longer / more-specific alternatives must precede shorter
+// generic ones (e.g. `--o` before `--+`, `x--x` before `x--`) since JS
+// regex alternation picks the first match at each starting position.
+export const EDGE_RE = /(<-->|<==>|<-\.->|x--x|x==x|o--o|o==o|--\|>|<\|--|x--|--x|o--|--o|x==|==x|o==|==o|\*--|--\*|-\.+->|-\.+-|--+>|==+>|--+|==+|~~~+)/;
 export const NODE_OPEN = /^([A-Za-z_][\w-]*)(\[|\(|\{|>|\[\[|\(\[|\(\(|\{\{)/;
 
 const BRACKET_PAIRS = {

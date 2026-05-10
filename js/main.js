@@ -70,6 +70,19 @@ function deleteActiveChat() {
   refreshSelect();
 }
 
+// ─── Burger menu ───
+const burgerBtn = document.getElementById('burger-btn');
+const burgerMenu = document.getElementById('burger-menu');
+burgerBtn.addEventListener('click', e => {
+  e.stopPropagation();
+  burgerMenu.hidden = !burgerMenu.hidden;
+});
+document.addEventListener('click', e => {
+  if (!burgerMenu.hidden && !burgerMenu.contains(e.target)) {
+    burgerMenu.hidden = true;
+  }
+});
+
 // ─── Example dropdown ───
 EXAMPLES.forEach((ex, i) => {
   const opt = document.createElement('option');
@@ -83,6 +96,7 @@ exampleSelect.addEventListener('change', e => {
   const ex = EXAMPLES[Number(i)];
   openChatWith(ex.code, `Example - ${ex.label}`, { greet: false, seedMessage: `Loaded example: ${ex.label}.` });
   exampleSelect.value = '';
+  burgerMenu.hidden = true;
 });
 
 // ─── Chat controls ───
