@@ -73,17 +73,23 @@ function deleteActiveChat() {
 // ─── Burger menu ───
 const burgerBtn = document.getElementById('burger-btn');
 const burgerMenu = document.getElementById('burger-menu');
-const burgerItems = document.querySelectorAll('button.burger-item')
+
 burgerBtn.addEventListener('click', e => {
   e.stopPropagation();
   burgerMenu.hidden = !burgerMenu.hidden;
 });
+
 document.addEventListener('click', e => {
   if (!burgerMenu.hidden && !burgerMenu.contains(e.target)) {
     burgerMenu.hidden = true;
   }
 });
-burgerItems.forEach(item => item.addEventListener('click', () => { burgerMenu.hidden = true; }));
+
+burgerMenu.addEventListener('click', e => {
+  if (e.target.matches('button.burger-item, .burger-item button')) {
+    burgerMenu.hidden = true; 
+  }
+});
 
 // ─── Example dropdown ───
 EXAMPLES.forEach((ex, i) => {
