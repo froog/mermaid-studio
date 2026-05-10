@@ -223,6 +223,7 @@ async function handleMessages(req, res) {
   const system = typeof payload.system === 'string' ? payload.system : '';
   const messages = Array.isArray(payload.messages) ? payload.messages : [];
   const max_tokens = Number(payload.max_tokens) || 1000;
+  console.log(`[messages] provider=${provider} model=${model} messages=${messages.length} max_tokens=${max_tokens}`);
   if (!provider) { sendJson(res, 400, { error: 'Missing provider' }); return true; }
   if (!model)    { sendJson(res, 400, { error: 'Missing model' });    return true; }
 
@@ -236,7 +237,7 @@ async function handleMessages(req, res) {
       openaiCompatible: cfg.openaiCompatible !== false,
       customHeaders: parseHeaders(cfg.headers),
     });
-    apiKey = cfg.apiKey || '';
+    apiKey = getStoredKey(username, 'custom') || '';
   } else {
     const p = providers.getProvider(provider);
     if (!p) { sendJson(res, 400, { error: `Unknown provider: ${provider}` }); return true; }
@@ -253,26 +254,33 @@ async function handleMessages(req, res) {
   try {
     built = adapter.buildRequest({ model, system, messages, max_tokens }, apiKey);
   } catch (err) {
+    console.error('[messages] build error', err.message);
     sendJson(res, 400, { error: `Failed to build request: ${err.message}` });
     return true;
   }
 
+  console.log(`[messages] → ${built.url}`);
   forwardRequest(built, (err, statusCode, data) => {
     if (err) {
+      console.error('[messages] network error', err.message);
       sendJson(res, 502, { error: err.message });
       return;
     }
     if (statusCode >= 400) {
       const detail = (data && (data.error?.message || data.error?.error?.message || data.error || data.message)) || `Upstream error ${statusCode}`;
+      console.error(`[messages] ← ${statusCode}`, typeof detail === 'string' ? detail : JSON.stringify(detail));
+      console.error('[messages] full response', JSON.stringify(data));
       sendJson(res, statusCode, { error: typeof detail === 'string' ? detail : JSON.stringify(detail) });
       return;
     }
     let content;
     try { content = adapter.parseResponse(data); }
     catch (parseErr) {
+      console.error('[messages] parse error', parseErr.message, JSON.stringify(data));
       sendJson(res, 502, { error: `Failed to parse response: ${parseErr.message}` });
       return;
     }
+    console.log(`[messages] ← ${statusCode} ok, ${content?.length ?? '?'} chars`);
     sendJson(res, 200, { content });
   });
   return true;
