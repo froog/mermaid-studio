@@ -320,13 +320,14 @@ function routeStatic(req, res) {
     '/index.css':  { file: 'index.css',  type: 'text/css; charset=utf-8' },
     '/HELP.md':    { file: 'HELP.md',    type: 'text/markdown; charset=utf-8' },
   };
-  if (STATIC[req.url]) {
-    const { file, type } = STATIC[req.url];
+  const urlPath = req.url.split('?')[0];
+  if (STATIC[urlPath]) {
+    const { file, type } = STATIC[urlPath];
     serveFile(res, path.join(ROOT, file), type);
     return true;
   }
-  if (req.url.startsWith('/js/')) {
-    const name = path.basename(req.url);
+  if (urlPath.startsWith('/js/')) {
+    const name = path.basename(urlPath);
     serveFile(res, path.join(ROOT, 'js', name), 'application/javascript; charset=utf-8');
     return true;
   }

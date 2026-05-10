@@ -55,6 +55,23 @@ The model picker is data-driven — see `providers/index.js` to add or update mo
 - `keys.json` — auto-created, gitignored. AES-256-GCM-encrypted API keys per user.
 - `.env` — auto-created, gitignored. Holds `ENCRYPTION_SECRET`.
 
+## Demo mode
+
+Share a URL that auto-logs in visitors as a pre-created `demo` user:
+
+```
+https://your-host/?demo=<password>
+```
+
+The value of the `demo` query parameter is used as the password for the `demo` account. To set it up:
+
+1. Sign up normally with username `demo` and a password of your choosing (e.g. a UUID).
+2. Share `/?demo=<that-password>` with whoever should have demo access.
+
+Visitors who open the link are logged in automatically. If the password is wrong or the `demo` account doesn't exist, they arrive logged out with no error shown.
+
+The password travels in the URL — treat it as a low-privilege shared secret, not a user credential.
+
 ## Constraints
 
 - Zero npm dependencies — Node built-ins only.

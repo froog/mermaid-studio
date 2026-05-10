@@ -7,6 +7,9 @@ let mode = 'login'; // 'login' | 'signup'
 let currentUser = null;
 const subscribers = new Set();
 
+const demoPassword = new URLSearchParams(location.search).get('demo');
+export function isDemoMode() { return !!demoPassword; }
+
 export function getCurrentUser() { return currentUser; }
 export function onAuthChange(fn) { subscribers.add(fn); return () => subscribers.delete(fn); }
 function emit() { subscribers.forEach(fn => { try { fn(currentUser); } catch (e) { console.error(e); } }); }
@@ -17,9 +20,26 @@ export async function checkSession() {
     if (res.ok) {
       const data = await res.json();
       setUser(data.username);
+    } else if (demoPassword) {
+      await autoDemoLogin();
     } else {
       setUser(null);
     }
+  } catch {
+    setUser(null);
+  }
+}
+
+async function autoDemoLogin() {
+  try {
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ username: 'demo', password: demoPassword }),
+    });
+    const data = await res.json().catch(() => ({}));
+    setUser(res.ok ? data.username : null);
   } catch {
     setUser(null);
   }
