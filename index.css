@@ -813,7 +813,6 @@ textarea:focus, input:focus, select:focus, button:focus-visible {
   font-size: 13px;
   color: var(--fg-dim);
 }
-#settings-system-prompt { min-height: 200px; }
 
 /* ─── Markdown body ─── */
 .markdown-body {

@@ -100,7 +100,7 @@ export async function sendMessage() {
       ? `Current editor contents (the diagram the user is looking at right now). When the user asks to "modify", "add to", "change", or otherwise edit "the diagram", treat this as the source. When you respond with a new diagram, return the FULL updated mermaid block, not just the changed lines.\n\n\`\`\`mermaid\n${editor.value}\n\`\`\``
       : 'The editor is currently empty.';
 
-    const system = `${sel.systemPrompt}\n\n---\n\n${editorContext}`;
+    const system = `{editorContext}`;
 
     const apiMessages = chatMessages
       .filter(m => m.role !== 'system')

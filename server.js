@@ -220,7 +220,7 @@ async function handleMessages(req, res) {
   const payload = await readJson(req);
   const provider = String(payload.provider || '').trim();
   const model = String(payload.model || '').trim();
-  const system = typeof payload.system === 'string' ? payload.system : '';
+  const system = `${DEFAULT_SYSTEM_PROMPT}\n\n---\n\n${payload.system}`;
   const messages = Array.isArray(payload.messages) ? payload.messages : [];
   const max_tokens = Number(payload.max_tokens) || 1000;
   console.log(`[messages] provider=${provider} model=${model} messages=${messages.length} max_tokens=${max_tokens}`);
