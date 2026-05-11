@@ -21,7 +21,7 @@ const ENCRYPTION_SECRET = Buffer.from(process.env.ENCRYPTION_SECRET, 'hex');
 const sessions = new Map();
 
 // ─── Boot ───────────────────────────────────────────────────────────────────
-const server = http.createServer(async (req, res) => {
+async function handler(req, res) {
   try {
     if (await routeApi(req, res)) return;
     if (routeStatic(req, res)) return;
@@ -30,11 +30,19 @@ const server = http.createServer(async (req, res) => {
     console.error('Unhandled error:', err);
     sendJson(res, 500, { error: 'Internal server error' });
   }
-});
+}
 
-server.listen(PORT, () => {
-  console.log(`\n  ⚡ Mermaid Studio running at http://localhost:${PORT}\n`);
-});
+const SSL_CERT = process.env.SSL_CERT;
+const SSL_KEY  = process.env.SSL_KEY;
+
+let server;
+if (SSL_CERT && SSL_KEY) {
+  server = https.createServer({ cert: fs.readFileSync(SSL_CERT), key: fs.readFileSync(SSL_KEY) }, handler);
+  server.listen(PORT, () => console.log(`\n  ⚡ Mermaid Studio running at https://localhost:${PORT}\n`));
+} else {
+  server = http.createServer(handler);
+  server.listen(PORT, () => console.log(`\n  ⚡ Mermaid Studio running at http://localhost:${PORT}\n`));
+}
 
 // ─── API routing ────────────────────────────────────────────────────────────
 async function routeApi(req, res) {

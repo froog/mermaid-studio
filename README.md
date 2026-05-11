@@ -30,6 +30,26 @@ npm install pm2 -g
 pm2 start server.js
 ```
 
+## HTTPS
+
+Set `SSL_CERT` and `SSL_KEY` to the paths of your certificate and private key files. The server starts in HTTPS mode automatically; without them it falls back to HTTP.
+
+```sh
+SSL_CERT=/etc/letsencrypt/live/yourdomain.com/fullchain.pem \
+SSL_KEY=/etc/letsencrypt/live/yourdomain.com/privkey.pem \
+node server.js
+```
+
+With PM2, set them in your environment or a [PM2 ecosystem file](https://pm2.keymetrics.io/docs/usage/application-declaration/) so they persist across restarts.
+
+To obtain a free certificate with [Let's Encrypt](https://letsencrypt.org/):
+
+```sh
+sudo certbot certonly --standalone -d yourdomain.com
+```
+
+Certbot renews certificates automatically. Configure a renewal hook to restart the server afterwards so it picks up the new cert.
+
 ## First-time setup
 
 1. Click **Sign in** in the chat pane and create an account (local — username + password).
