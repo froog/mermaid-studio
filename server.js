@@ -9,6 +9,7 @@ const PORT = Number(process.env.PORT) || 3000;
 const ROOT = __dirname;
 const USERS_FILE = path.join(ROOT, 'users.json');
 const KEYS_FILE = path.join(ROOT, 'keys.json');
+const PREFS_FILE = path.join(ROOT, 'prefs.json');
 const ENV_FILE = path.join(ROOT, '.env');
 
 // ─── Env (.env) ─────────────────────────────────────────────────────────────
@@ -61,6 +62,9 @@ async function routeApi(req, res) {
   if (req.method === 'POST'   && url === '/api/keys') return handlePostKey(req, res);
   if (req.method === 'GET'    && url === '/api/keys') return handleListKeys(req, res);
   if (req.method === 'DELETE' && url.startsWith('/api/keys/')) return handleDeleteKey(req, res);
+
+  if (req.method === 'GET' && url === '/api/prefs') return handleGetPrefs(req, res);
+  if (req.method === 'PUT' && url === '/api/prefs') return handlePutPrefs(req, res);
 
   if (req.method === 'POST' && url === '/api/messages')    return handleMessages(req, res);
 
@@ -190,6 +194,24 @@ function handleDeleteKey(req, res) {
   }
   sendJson(res, 200, { ok: true });
   return true;
+}
+
+// ─── Preferences handlers ──────────────────────────────────────────────────
+function handleGetPrefs(req, res) {
+  const username = currentUser(req);
+  if (!username) { sendJson(res, 401, { error: 'Not signed in' }); return true; }
+  const all = readJson_(PREFS_FILE);
+  sendJson(res, 200, all[username] || {});
+}
+
+async function handlePutPrefs(req, res) {
+  const username = currentUser(req);
+  if (!username) { sendJson(res, 401, { error: 'Not signed in' }); return true; }
+  const body = await readJson(req);
+  const all = readJson_(PREFS_FILE);
+  all[username] = body;
+  writeJson_(PREFS_FILE, all);
+  sendJson(res, 200, { ok: true });
 }
 
 // ─── Encryption (AES-256-GCM) ───────────────────────────────────────────────

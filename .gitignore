@@ -3,6 +3,7 @@ node_modules/
 .env.local
 users.json
 keys.json
+prefs.json
 *.log
 .DS_Store
 .idea/
