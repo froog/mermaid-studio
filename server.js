@@ -209,10 +209,12 @@ async function handlePutPrefs(req, res) {
   const username = currentUser(req);
   if (!username) { sendJson(res, 401, { error: 'Not signed in' }); return true; }
   const body = await readJson(req);
+  if (body && body.custom) delete body.custom.apiKey;
   const all = readJson_(PREFS_FILE);
   all[username] = body;
   writeJson_(PREFS_FILE, all);
   sendJson(res, 200, { ok: true });
+  return true;
 }
 
 // ─── Encryption (AES-256-GCM) ───────────────────────────────────────────────
