@@ -61,7 +61,7 @@ async function loadAndApplyServerPrefs() {
     Object.assign(prefs, sp);
     if (sp.custom) prefs.custom = { ...DEFAULTS.custom, ...sp.custom };
     delete prefs.custom?.apiKey; // never trust apiKey from server prefs
-    savePrefs();           // update localStorage cache
+    try { localStorage.setItem(PREFS_KEY, JSON.stringify(prefs)); } catch {}
     loadCustomIntoForm();
     applyProvider(prefs.provider);
   } catch {}
