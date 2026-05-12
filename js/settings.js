@@ -27,6 +27,44 @@ function loadPrefs() {
 }
 function savePrefs() {
   try { localStorage.setItem(PREFS_KEY, JSON.stringify(prefs)); } catch {}
+  debounceSaveToServer();
+}
+
+let _saveToServerTimer = null;
+function debounceSaveToServer() {
+  clearTimeout(_saveToServerTimer);
+  _saveToServerTimer = setTimeout(savePrefsToServer, 500);
+}
+async function savePrefsToServer() {
+  if (!getCurrentUser()) return;
+  try {
+    await fetch('/api/prefs', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify(prefs),
+    });
+  } catch {}
+}
+
+async function loadAndApplyServerPrefs() {
+  try {
+    const res = await fetch('/api/prefs', { credentials: 'same-origin' });
+    if (!res.ok) return;
+    const sp = await res.json();
+    if (!sp || Object.keys(sp).length === 0) {
+      // No server prefs yet — push local prefs up
+      await savePrefsToServer();
+      return;
+    }
+    // Server prefs win: merge into local prefs
+    Object.assign(prefs, sp);
+    if (sp.custom) prefs.custom = { ...DEFAULTS.custom, ...sp.custom };
+    delete prefs.custom?.apiKey; // never trust apiKey from server prefs
+    savePrefs();           // update localStorage cache
+    loadCustomIntoForm();
+    applyProvider(prefs.provider);
+  } catch {}
 }
 
 let prefs = loadPrefs();
@@ -363,6 +401,7 @@ customKeyDeleteBtn.addEventListener('click', deleteCustomKey);
 // ─── React to auth state ────────────────────────────────────────────────
 onAuthChange(async () => {
   await refreshStoredKeys();
+  if (getCurrentUser()) await loadAndApplyServerPrefs();
   if (!panel.hidden) {
     refreshKeyRow();
     if (prefs.provider === 'custom') refreshCustomKeyRow();
