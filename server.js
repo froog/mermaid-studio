@@ -202,6 +202,7 @@ function handleGetPrefs(req, res) {
   if (!username) { sendJson(res, 401, { error: 'Not signed in' }); return true; }
   const all = readJson_(PREFS_FILE);
   sendJson(res, 200, all[username] || {});
+  return true;
 }
 
 async function handlePutPrefs(req, res) {
