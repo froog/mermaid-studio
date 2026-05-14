@@ -129,19 +129,13 @@ export async function sendMessage() {
   renderChat();
 
   try {
-    const editorContext = editor.value.trim()
-      ? `Current editor contents (the diagram the user is looking at right now). When the user asks to "modify", "add to", "change", or otherwise edit "the diagram", treat this as the source. When you respond with a new diagram, return the FULL updated mermaid block, not just the changed lines.\n\n\`\`\`mermaid\n${editor.value}\n\`\`\``
-      : 'The editor is currently empty.';
-
-    const system = `${editorContext}`;
+    const context = editor.value.trim();
 
     const apiMessages = chatMessages
       .filter(m => m.role !== 'system' && m.source !== 'edit')
       .map(m => ({
         role: m.role,
-        content: m.code
-          ? (m.content ? `${m.content}\n\n\`\`\`mermaid\n${m.code}\n\`\`\`` : `\`\`\`mermaid\n${m.code}\n\`\`\``)
-          : m.content,
+        content: m.content
       }));
 
     const res = await fetch('/api/messages', {
@@ -151,7 +145,7 @@ export async function sendMessage() {
       body: JSON.stringify({
         provider: sel.provider,
         model: sel.model,
-        system,
+        context,
         messages: apiMessages,
         ...(sel.custom ? { custom: sel.custom } : {}),
       }),
@@ -170,8 +164,8 @@ export async function sendMessage() {
     chatMessages.push({ role: 'assistant', content, ts: Date.now(), prev: prevCode, ...(code ? { code } : {}) });
     if (res.ok && code) setCode(code);
   } catch {
-    chatMessages.push({ role: 'assistant', content: "Network error — couldn't reach the AI.", ts: Date.now() });
-  }
+   chatMessages.push({ role: 'assistant', content: "Network error — couldn't reach the AI.", ts: Date.now() });
+ }
 
   setChatLoading(false);
   persist();

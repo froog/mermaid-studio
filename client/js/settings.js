@@ -76,7 +76,6 @@ export function getSelection() {
     return {
       provider: 'custom',
       model: prefs.custom.model,
-      systemPrompt: prefs.systemPrompt,
       custom: { ...prefs.custom },
     };
   }
@@ -87,7 +86,6 @@ export function getSelection() {
   return {
     provider: prefs.provider,
     model,
-    systemPrompt: prefs.systemPrompt,
     custom: null,
   };
 }
@@ -122,7 +120,6 @@ const customKeyLocked = $('settings-custom-key-locked');
 const customCompat = $('settings-custom-compat');
 const customHeadersRow = $('settings-custom-headers-row');
 const customHeaders = $('settings-custom-headers');
-const systemPromptArea = $('settings-system-prompt');
 const promptResetBtn = $('settings-prompt-reset');
 
 // ─── Open/close ─────────────────────────────────────────────────────────

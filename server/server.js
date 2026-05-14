@@ -256,7 +256,8 @@ async function handleMessages(req, res) {
   const payload = await readJson(req);
   const provider = String(payload.provider || '').trim();
   const model = String(payload.model || '').trim();
-  const system = `${providers.DEFAULT_SYSTEM_PROMPT}\n\n---\n\n${payload.system}`;
+  const context = String(payload.context || '').trim();
+  const system = `${providers.DEFAULT_SYSTEM_PROMPT}\n\n---\n\n${context}`;
   const messages = Array.isArray(payload.messages) ? payload.messages : [];
   console.log(`[messages] provider=${provider} model=${model} messages=${messages.length} max_tokens=${MAX_TOKENS}`);
   if (!provider) { sendJson(res, 400, { error: 'Missing provider' }); return true; }

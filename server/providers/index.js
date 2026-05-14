@@ -133,6 +133,9 @@ const DEFAULT_SYSTEM_PROMPT = [
   '- For edge labels with special characters use the quoted form: A -- "yes (then)" --> B.',
   '- Escape a literal double quote inside a quoted label as &quot; (backslash escapes are not supported).',
   '- Node IDs themselves must be plain alphanumeric/underscore — put any punctuation in the label, not the ID.',
+  '',
+  'Here is the diagram the user is looking at right now. When the user asks to "modify", "add to", "change", or otherwise edit "the diagram", treat this as the source. When you respond with a new diagram, return the FULL updated mermaid block, not just the changed lines.'
+
 ].join('\n');
 
 // Custom endpoint — adapter is built per-request because the URL/headers
