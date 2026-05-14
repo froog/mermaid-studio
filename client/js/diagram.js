@@ -253,8 +253,6 @@ export function tagSvgElements() {
       }
     }
   });
-
-  console.debug('[ms] tagged', tagged, 'SVG elements; map size:', byElementId.size);
 }
 
 // ─── Diagram Rendering ───

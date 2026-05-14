@@ -2,18 +2,18 @@
 
 A minimal browser-based studio for authoring and previewing [Mermaid](https://mermaid.js.org/) diagrams, with AI-assisted generation.
 
-🪄 Live editor + preview + AI chat in one window.
-🔌 Pick your LLM: Anthropic, OpenAI, Gemini, Mistral, Ollama + more, or your own custom OpenAI-compatible endpoint.
-🔐 Bring your own keys — stored encrypted server-side, never in the browser.
-🖱️ Easy context - Right-click any node/edge/subgraph to rename, reshape, or AI-transform it.
-📦 Zero npm deps, single node server/server.js, runs anywhere.
+- Live editor + preview + AI chat in one window.
+- Easily connect to your chosen LLM
+- Right-click any node/edge/subgraph to rename, reshape, or AI-transform it.
+- Zero npm deps, data stored as files, single node server, runs anywhere.
 
-The editor and preview work fully without an account. AI features require signing up locally so your API keys can be stored encrypted on disk and never live in the browser.
+The editor and preview work fully without an account. AI features require signing up locally so your API keys can be stored encrypted on the server.
 
 ## Requirements
 
-- Node.js (no npm dependencies — uses only built-ins)
-- An API key for at least one supported provider
+- Node.js
+- Optional: An API key for at least one supported provider
+- Optional: To run detached, or in prod, a tool like pm
 
 ## Run
 
@@ -63,7 +63,7 @@ You can switch providers or models at any time. Keys are stored per provider, pe
 
 Anthropic · OpenAI · Google · Mistral · DeepSeek · xAI · Cohere · Meta (via Groq) · OpenRouter · Custom (any OpenAI-compatible host: Ollama, vLLM, LM Studio, etc.)
 
-The model picker is data-driven — see `providers/index.js` to add or update model IDs.
+The model picker is data-driven — see `server/providers/index.js` to add or update model IDs.
 
 ## Files
 

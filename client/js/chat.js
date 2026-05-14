@@ -153,7 +153,6 @@ export async function sendMessage() {
         model: sel.model,
         system,
         messages: apiMessages,
-        max_tokens: 1000,
         ...(sel.custom ? { custom: sel.custom } : {}),
       }),
     });

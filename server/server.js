@@ -6,11 +6,14 @@ const crypto = require('crypto');
 const providers = require('./providers');
 
 const PORT = Number(process.env.PORT) || 3000;
-const ROOT = __dirname;
-const USERS_FILE = path.join(ROOT, 'users.json');
-const KEYS_FILE = path.join(ROOT, 'keys.json');
-const PREFS_FILE = path.join(ROOT, 'prefs.json');
-const ENV_FILE = path.join(ROOT, '.env');
+const PROJECT_ROOT = path.join(__dirname, '..');
+const CLIENT_ROOT  = path.join(PROJECT_ROOT, 'client');
+const USERS_FILE = path.join(PROJECT_ROOT, 'data/users.json');
+const KEYS_FILE  = path.join(PROJECT_ROOT, 'data/keys.json');
+const PREFS_FILE = path.join(PROJECT_ROOT, 'data/prefs.json');
+const ENV_FILE   = path.join(PROJECT_ROOT, '.env');
+
+const MAX_TOKENS = 4000;
 
 // ─── Env (.env) ─────────────────────────────────────────────────────────────
 loadEnvFile();
@@ -255,8 +258,7 @@ async function handleMessages(req, res) {
   const model = String(payload.model || '').trim();
   const system = `${providers.DEFAULT_SYSTEM_PROMPT}\n\n---\n\n${payload.system}`;
   const messages = Array.isArray(payload.messages) ? payload.messages : [];
-  const max_tokens = Number(payload.max_tokens) || 1000;
-  console.log(`[messages] provider=${provider} model=${model} messages=${messages.length} max_tokens=${max_tokens}`);
+  console.log(`[messages] provider=${provider} model=${model} messages=${messages.length} max_tokens=${MAX_TOKENS}`);
   if (!provider) { sendJson(res, 400, { error: 'Missing provider' }); return true; }
   if (!model)    { sendJson(res, 400, { error: 'Missing model' });    return true; }
 
@@ -285,7 +287,7 @@ async function handleMessages(req, res) {
   // Build vendor request and forward
   let built;
   try {
-    built = adapter.buildRequest({ model, system, messages, max_tokens }, apiKey);
+    built = adapter.buildRequest({ model, system, messages, max_tokens:MAX_TOKENS}, apiKey);
   } catch (err) {
     console.error('[messages] build error', err.message);
     sendJson(res, 400, { error: `Failed to build request: ${err.message}` });
@@ -364,12 +366,12 @@ function routeStatic(req, res) {
   const urlPath = req.url.split('?')[0];
   if (STATIC[urlPath]) {
     const { file, type } = STATIC[urlPath];
-    serveFile(res, path.join(ROOT, file), type);
+    serveFile(res, path.join(CLIENT_ROOT, file), type);
     return true;
   }
   if (urlPath.startsWith('/js/')) {
     const name = path.basename(urlPath);
-    serveFile(res, path.join(ROOT, 'js', name), 'application/javascript; charset=utf-8');
+    serveFile(res, path.join(CLIENT_ROOT, 'js', name), 'application/javascript; charset=utf-8');
     return true;
   }
   return false;

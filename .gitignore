@@ -1,10 +1,8 @@
 node_modules/
 .env
 .env.local
-users.json
-keys.json
-prefs.json
 *.log
 .DS_Store
 .idea/
 .vscode/
+data/
