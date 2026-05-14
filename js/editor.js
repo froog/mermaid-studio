@@ -1,8 +1,11 @@
 import { editor, lineNumbers, chatSelect, downloadBtn } from './dom.js';
-import { activeChat, store, saveStore, deriveTitle } from './store.js';
+import { activeChat, chatMessages, store, saveStore, deriveTitle } from './store.js';
 import { scheduleRender } from './diagram.js';
 
 export let charWidth = 7.8;
+
+let _snapTimer = null;
+let _lastSnapshotCode = '';
 
 (() => {
   const s = document.createElement('span');
@@ -47,14 +50,30 @@ export function persist() {
   refreshSelect();
 }
 
+function recordSnapshot() {
+  const code = editor.value.trim();
+  if (!code || code === _lastSnapshotCode) return;
+  const prev = _lastSnapshotCode;
+  _lastSnapshotCode = code;
+  chatMessages.push({ role: 'assistant', content: `\`\`\`mermaid\n${code}\n\`\`\``, ts: Date.now(), source: 'edit', prev });
+  saveStore();
+  document.dispatchEvent(new CustomEvent('editor-snapshot'));
+}
+
 export function setCode(code) {
   editor.value = code;
   updateLineNumbers();
   scheduleRender();
   persist();
+  clearTimeout(_snapTimer);
+  _lastSnapshotCode = code.trim();
 }
 
-editor.addEventListener('input', () => { updateLineNumbers(); scheduleRender(); persist(); });
+editor.addEventListener('input', () => {
+  updateLineNumbers(); scheduleRender(); persist();
+  clearTimeout(_snapTimer);
+  _snapTimer = setTimeout(recordSnapshot, 2000);
+});
 editor.addEventListener('scroll', () => { lineNumbers.scrollTop = editor.scrollTop; });
 editor.addEventListener('keydown', e => {
   if (e.key === 'Tab') {
@@ -66,6 +85,8 @@ editor.addEventListener('keydown', e => {
     updateLineNumbers();
     scheduleRender();
     persist();
+    clearTimeout(_snapTimer);
+    _snapTimer = setTimeout(recordSnapshot, 2000);
   }
 });
 

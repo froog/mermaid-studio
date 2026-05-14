@@ -1,8 +1,7 @@
 import { EXAMPLES } from './config.js';
-import { editor, chatSelect, chatNewBtn, chatDelBtn, exampleSelect, loadBtn, loadInput } from './dom.js';
+import { chatSelect, chatNewBtn, chatDelBtn, exampleSelect, loadBtn, loadInput } from './dom.js';
 import { store, activeChat, saveStore, setActiveChat, seedChat, makeChat, deriveTitle } from './store.js';
-import { scheduleRender } from './diagram.js';
-import { setCode, updateLineNumbers, refreshSelect } from './editor.js';
+import { setCode, refreshSelect } from './editor.js';
 import { renderChat } from './chat.js';
 import './ui.js';
 import { checkSession } from './auth.js';
@@ -24,9 +23,7 @@ function switchChat(id) {
   if (!store.chats[id]) return;
   setActiveChat(id);
   saveStore();
-  editor.value = activeChat.code;
-  updateLineNumbers();
-  scheduleRender();
+  setCode(activeChat.code);
   renderChat();
   refreshSelect();
 }
@@ -34,19 +31,16 @@ function switchChat(id) {
 function openChatWith(code, titleHint, opts) {
   const c = makeChat(code, opts);
   if (titleHint) c.title = titleHint;
-  if (opts && opts.seedMessage && code && code.trim()) {
-    c.messages.push({
-      role: 'assistant',
-      content: `${opts.seedMessage}\n\n\`\`\`mermaid\n${code}\n\`\`\``,
-      ts: Date.now(),
-    });
+  if (opts && opts.seedMessage) {
+    const content = (opts.noCodePreview || !code || !code.trim())
+      ? opts.seedMessage
+      : `${opts.seedMessage}\n\n\`\`\`mermaid\n${code}\n\`\`\``;
+    c.messages.push({ role: 'assistant', content, ts: Date.now() });
   }
   store.chats[c.id] = c;
   setActiveChat(c.id);
   saveStore();
-  editor.value = c.code;
-  updateLineNumbers();
-  scheduleRender();
+  setCode(c.code);
   renderChat();
   refreshSelect();
 }
@@ -63,9 +57,7 @@ function deleteActiveChat() {
     setActiveChat(remaining[0]);
   }
   saveStore();
-  editor.value = activeChat.code;
-  updateLineNumbers();
-  scheduleRender();
+  setCode(activeChat.code);
   renderChat();
   refreshSelect();
 }
@@ -126,7 +118,7 @@ loadInput.addEventListener('change', () => {
   const reader = new FileReader();
   reader.onload = () => {
     const text = String(reader.result || '');
-    openChatWith(text, file.name || 'Loaded chat', { greet: false, seedMessage: `Loaded file: ${file.name}.` });
+    openChatWith(text, file.name || 'Loaded chat', { greet: false, seedMessage: `Loaded file: ${file.name}.`, noCodePreview: true });
   };
   reader.readAsText(file);
 });

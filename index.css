@@ -449,6 +449,18 @@ textarea:focus, input:focus, select:focus, button:focus-visible {
   margin: 0;
   line-height: 1.65;
 }
+.snapshot-label {
+  padding: 10px 16px 8px;
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--fg-faint);
+  border-bottom: 1px solid var(--line);
+}
+.diff-removed { color: var(--danger); }
+.diff-added   { color: var(--accent2); }
+
 .insert-btn {
   width: 100%;
   padding: 10px 0;

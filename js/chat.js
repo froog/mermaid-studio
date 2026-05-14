@@ -5,6 +5,14 @@ import { setCode, persist } from './editor.js';
 import { getSelection } from './settings.js';
 import { getCurrentUser } from './auth.js';
 
+function lineDiff(oldCode, newCode) {
+  const a = (oldCode || '').split('\n').map(l => l.trimEnd()).filter(Boolean);
+  const b = (newCode || '').split('\n').map(l => l.trimEnd()).filter(Boolean);
+  const aSet = new Set(a);
+  const bSet = new Set(b);
+  return { removed: a.filter(l => !bSet.has(l)), added: b.filter(l => !aSet.has(l)) };
+}
+
 export function renderChat() {
   chatScroll.textContent = '';
   const display = (chatMessages.length === 0 && activeChat.showGreeting)
@@ -26,29 +34,79 @@ export function renderChat() {
       bubble.appendChild(ts);
     }
 
-    const parts = msg.content.split(/(```mermaid[\s\S]*?```)/g);
-    parts.forEach(part => {
-      const match = part.match(/^```mermaid\n?([\s\S]*?)```$/);
-      if (match) {
-        const code = match[1].trim();
-        const block = document.createElement('div');
-        block.className = 'code-block';
+    if (msg.source === 'edit') {
+      const mermaidMatch = msg.content.match(/```mermaid\n?([\s\S]*?)```/);
+      const code = mermaidMatch ? mermaidMatch[1].trim() : '';
+      const { added, removed } = lineDiff(msg.prev || '', code);
+      const block = document.createElement('div');
+      block.className = 'code-block';
+      if (added.length || removed.length) {
         const pre = document.createElement('pre');
-        pre.textContent = code;
+        for (const l of removed) {
+          const span = document.createElement('span');
+          span.className = 'diff-removed';
+          span.textContent = `− ${l}\n`;
+          pre.appendChild(span);
+        }
+        for (const l of added) {
+          const span = document.createElement('span');
+          span.className = 'diff-added';
+          span.textContent = `+ ${l}\n`;
+          pre.appendChild(span);
+        }
         block.appendChild(pre);
+      }
+      if (code) {
         const btn = document.createElement('button');
         btn.className = 'insert-btn';
         btn.textContent = '↗ Insert into Editor';
         btn.addEventListener('click', () => setCode(code));
         block.appendChild(btn);
-        bubble.appendChild(block);
-      } else if (part.trim()) {
-        const span = document.createElement('span');
-        span.style.whiteSpace = 'pre-wrap';
-        span.textContent = part;
-        bubble.appendChild(span);
       }
-    });
+      bubble.appendChild(block);
+    } else {
+      const parts = msg.content.split(/(```mermaid[\s\S]*?```)/g);
+      parts.forEach(part => {
+        const match = part.match(/^```mermaid\n?([\s\S]*?)```$/);
+        if (match) {
+          const code = match[1].trim();
+          const block = document.createElement('div');
+          block.className = 'code-block';
+          if (msg.prev !== undefined) {
+            const { added, removed } = lineDiff(msg.prev, code);
+            const pre = document.createElement('pre');
+            for (const l of removed) {
+              const span = document.createElement('span');
+              span.className = 'diff-removed';
+              span.textContent = `− ${l}\n`;
+              pre.appendChild(span);
+            }
+            for (const l of added) {
+              const span = document.createElement('span');
+              span.className = 'diff-added';
+              span.textContent = `+ ${l}\n`;
+              pre.appendChild(span);
+            }
+            if (added.length || removed.length) block.appendChild(pre);
+          } else {
+            const pre = document.createElement('pre');
+            pre.textContent = code;
+            block.appendChild(pre);
+          }
+          const btn = document.createElement('button');
+          btn.className = 'insert-btn';
+          btn.textContent = '↗ Insert into Editor';
+          btn.addEventListener('click', () => setCode(code));
+          block.appendChild(btn);
+          bubble.appendChild(block);
+        } else if (part.trim()) {
+          const span = document.createElement('span');
+          span.style.whiteSpace = 'pre-wrap';
+          span.textContent = part;
+          bubble.appendChild(span);
+        }
+      });
+    }
 
     row.appendChild(bubble);
     chatScroll.appendChild(row);
@@ -100,7 +158,7 @@ export async function sendMessage() {
       ? `Current editor contents (the diagram the user is looking at right now). When the user asks to "modify", "add to", "change", or otherwise edit "the diagram", treat this as the source. When you respond with a new diagram, return the FULL updated mermaid block, not just the changed lines.\n\n\`\`\`mermaid\n${editor.value}\n\`\`\``
       : 'The editor is currently empty.';
 
-    const system = `{editorContext}`;
+    const system = `${editorContext}`;
 
     const apiMessages = chatMessages
       .filter(m => m.role !== 'system')
@@ -126,7 +184,8 @@ export async function sendMessage() {
     } else {
       reply = data.content || 'Sorry, something went wrong.';
     }
-    chatMessages.push({ role: 'assistant', content: reply, ts: Date.now() });
+    const prevCode = editor.value.trim();
+    chatMessages.push({ role: 'assistant', content: reply, ts: Date.now(), prev: prevCode });
     if (res.ok) {
       const m = reply.match(/```mermaid\n?([\s\S]*?)```/);
       if (m) setCode(m[1].trim());
@@ -142,3 +201,4 @@ export async function sendMessage() {
 
 sendBtn.addEventListener('click', sendMessage);
 chatInput.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) sendMessage(); });
+document.addEventListener('editor-snapshot', renderChat);
