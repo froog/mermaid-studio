@@ -55,7 +55,7 @@ function recordSnapshot() {
   if (!code || code === _lastSnapshotCode) return;
   const prev = _lastSnapshotCode;
   _lastSnapshotCode = code;
-  chatMessages.push({ role: 'assistant', content: `\`\`\`mermaid\n${code}\n\`\`\``, ts: Date.now(), source: 'edit', prev });
+  chatMessages.push({ role: 'assistant', content: '', ts: Date.now(), source: 'edit', prev, code });
   saveStore();
   document.dispatchEvent(new CustomEvent('editor-snapshot'));
 }

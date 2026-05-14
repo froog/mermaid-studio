@@ -32,10 +32,8 @@ function openChatWith(code, titleHint, opts) {
   const c = makeChat(code, opts);
   if (titleHint) c.title = titleHint;
   if (opts && opts.seedMessage) {
-    const content = (opts.noCodePreview || !code || !code.trim())
-      ? opts.seedMessage
-      : `${opts.seedMessage}\n\n\`\`\`mermaid\n${code}\n\`\`\``;
-    c.messages.push({ role: 'assistant', content, ts: Date.now() });
+    const msgCode = (!opts.noCodePreview && code && code.trim()) ? code.trim() : '';
+    c.messages.push({ role: 'assistant', content: opts.seedMessage, ts: Date.now(), ...(msgCode ? { code: msgCode } : {}) });
   }
   store.chats[c.id] = c;
   setActiveChat(c.id);

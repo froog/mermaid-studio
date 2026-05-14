@@ -34,46 +34,19 @@ export function renderChat() {
       bubble.appendChild(ts);
     }
 
-    if (msg.source === 'edit') {
-      const mermaidMatch = msg.content.match(/```mermaid\n?([\s\S]*?)```/);
-      const code = mermaidMatch ? mermaidMatch[1].trim() : '';
-      const { added, removed } = lineDiff(msg.prev || '', code);
-      const block = document.createElement('div');
-      block.className = 'code-block';
-      if (added.length || removed.length) {
-        const pre = document.createElement('pre');
-        for (const l of removed) {
-          const span = document.createElement('span');
-          span.className = 'diff-removed';
-          span.textContent = `− ${l}\n`;
-          pre.appendChild(span);
-        }
-        for (const l of added) {
-          const span = document.createElement('span');
-          span.className = 'diff-added';
-          span.textContent = `+ ${l}\n`;
-          pre.appendChild(span);
-        }
-        block.appendChild(pre);
+    if (msg.code !== undefined) {
+      if (msg.content) {
+        const span = document.createElement('span');
+        span.style.whiteSpace = 'pre-wrap';
+        span.textContent = msg.content;
+        bubble.appendChild(span);
       }
-      if (code) {
-        const btn = document.createElement('button');
-        btn.className = 'insert-btn';
-        btn.textContent = '↗ Insert into Editor';
-        btn.addEventListener('click', () => setCode(code));
-        block.appendChild(btn);
-      }
-      bubble.appendChild(block);
-    } else {
-      const parts = msg.content.split(/(```mermaid[\s\S]*?```)/g);
-      parts.forEach(part => {
-        const match = part.match(/^```mermaid\n?([\s\S]*?)```$/);
-        if (match) {
-          const code = match[1].trim();
-          const block = document.createElement('div');
-          block.className = 'code-block';
-          if (msg.prev !== undefined) {
-            const { added, removed } = lineDiff(msg.prev, code);
+      if (msg.code) {
+        const block = document.createElement('div');
+        block.className = 'code-block';
+        if (msg.prev !== undefined) {
+          const { added, removed } = lineDiff(msg.prev, msg.code);
+          if (added.length || removed.length) {
             const pre = document.createElement('pre');
             for (const l of removed) {
               const span = document.createElement('span');
@@ -87,25 +60,27 @@ export function renderChat() {
               span.textContent = `+ ${l}\n`;
               pre.appendChild(span);
             }
-            if (added.length || removed.length) block.appendChild(pre);
-          } else {
-            const pre = document.createElement('pre');
-            pre.textContent = code;
             block.appendChild(pre);
           }
-          const btn = document.createElement('button');
-          btn.className = 'insert-btn';
-          btn.textContent = '↗ Insert into Editor';
-          btn.addEventListener('click', () => setCode(code));
-          block.appendChild(btn);
-          bubble.appendChild(block);
-        } else if (part.trim()) {
-          const span = document.createElement('span');
-          span.style.whiteSpace = 'pre-wrap';
-          span.textContent = part;
-          bubble.appendChild(span);
+        } else {
+          const pre = document.createElement('pre');
+          pre.textContent = msg.code;
+          block.appendChild(pre);
         }
-      });
+        const btn = document.createElement('button');
+        btn.className = 'insert-btn';
+        btn.textContent = '↗ Insert into Editor';
+        btn.addEventListener('click', () => setCode(msg.code));
+        block.appendChild(btn);
+        bubble.appendChild(block);
+      }
+    } else {
+      if (msg.content) {
+        const span = document.createElement('span');
+        span.style.whiteSpace = 'pre-wrap';
+        span.textContent = msg.content;
+        bubble.appendChild(span);
+      }
     }
 
     row.appendChild(bubble);
@@ -161,8 +136,13 @@ export async function sendMessage() {
     const system = `${editorContext}`;
 
     const apiMessages = chatMessages
-      .filter(m => m.role !== 'system')
-      .map(m => ({ role: m.role, content: m.content }));
+      .filter(m => m.role !== 'system' && m.source !== 'edit')
+      .map(m => ({
+        role: m.role,
+        content: m.code
+          ? (m.content ? `${m.content}\n\n\`\`\`mermaid\n${m.code}\n\`\`\`` : `\`\`\`mermaid\n${m.code}\n\`\`\``)
+          : m.content,
+      }));
 
     const res = await fetch('/api/messages', {
       method: 'POST',
@@ -184,12 +164,12 @@ export async function sendMessage() {
     } else {
       reply = data.content || 'Sorry, something went wrong.';
     }
+    const mMatch = reply.match(/```mermaid\n?([\s\S]*?)```/);
+    const code = mMatch ? mMatch[1].trim() : '';
+    const content = mMatch ? reply.replace(/```mermaid[\s\S]*?```/, '').trim() : reply;
     const prevCode = editor.value.trim();
-    chatMessages.push({ role: 'assistant', content: reply, ts: Date.now(), prev: prevCode });
-    if (res.ok) {
-      const m = reply.match(/```mermaid\n?([\s\S]*?)```/);
-      if (m) setCode(m[1].trim());
-    }
+    chatMessages.push({ role: 'assistant', content, ts: Date.now(), prev: prevCode, ...(code ? { code } : {}) });
+    if (res.ok && code) setCode(code);
   } catch {
     chatMessages.push({ role: 'assistant', content: "Network error — couldn't reach the AI.", ts: Date.now() });
   }
