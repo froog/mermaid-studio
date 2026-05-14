@@ -6,7 +6,7 @@ A minimal browser-based studio for authoring and previewing [Mermaid](https://me
 🔌 Pick your LLM: Anthropic, OpenAI, Gemini, Mistral, Ollama + more, or your own custom OpenAI-compatible endpoint.
 🔐 Bring your own keys — stored encrypted server-side, never in the browser.
 🖱️ Easy context - Right-click any node/edge/subgraph to rename, reshape, or AI-transform it.
-📦 Zero npm deps, single node server.js, runs anywhere.
+📦 Zero npm deps, single node server/server.js, runs anywhere.
 
 The editor and preview work fully without an account. AI features require signing up locally so your API keys can be stored encrypted on disk and never live in the browser.
 
@@ -18,7 +18,7 @@ The editor and preview work fully without an account. AI features require signin
 ## Run
 
 ```sh
-node server.js
+node server/server.js
 ```
 
 Then open <http://localhost:3000>. On first run it generates `.env` with an `ENCRYPTION_SECRET` used to encrypt stored API keys.
@@ -27,7 +27,7 @@ To run detached, or in production use a tool like [PM2](https://github.com/Unite
 
 ```sh
 npm install pm2 -g
-pm2 start server.js
+pm2 start server/server.js
 ```
 
 ## HTTPS
@@ -37,7 +37,7 @@ Set `SSL_CERT` and `SSL_KEY` to the paths of your certificate and private key fi
 ```sh
 SSL_CERT=/etc/letsencrypt/live/yourdomain.com/fullchain.pem \
 SSL_KEY=/etc/letsencrypt/live/yourdomain.com/privkey.pem \
-node server.js
+node server/server.js
 ```
 
 With PM2, set them in your environment or a [PM2 ecosystem file](https://pm2.keymetrics.io/docs/usage/application-declaration/) so they persist across restarts.
@@ -67,12 +67,12 @@ The model picker is data-driven — see `providers/index.js` to add or update mo
 
 ## Files
 
-- `server.js` — HTTP server: static files, auth, encrypted key storage, provider proxy.
-- `providers/` — adapters per provider (`anthropic.js`, `openai.js`, `google.js`, `cohere.js`) and the registry.
-- `index.html` / `index.css` — markup and styles.
-- `js/` — client modules (editor, preview, chat, auth, settings, persistence).
-- `users.json` — auto-created, gitignored. Username + scrypt-hashed password.
-- `keys.json` — auto-created, gitignored. AES-256-GCM-encrypted API keys per user.
+- `server/server.js` — HTTP server: static files, auth, encrypted key storage, provider proxy.
+- `server/providers/` — adapters per provider (`anthropic.js`, `openai.js`, `google.js`, `cohere.js`) and the registry.
+- `client/index.html` / `client/index.css` — markup and styles.
+- `client/js/` — client modules (editor, preview, chat, auth, settings, persistence).
+- `data/users.json` — auto-created, gitignored. Username + scrypt-hashed password.
+- `data/keys.json` — auto-created, gitignored. AES-256-GCM-encrypted API keys per user.
 - `.env` — auto-created, gitignored. Holds `ENCRYPTION_SECRET`.
 
 ## Demo mode
